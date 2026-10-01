@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Intranet Italac — Lá em casa tem.</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ==================== TELA DE LOGIN ==================== -->
+<div id="login-screen">
+  <div class="login-box">
+    
+    <div class="logo-wrap" id="logo-login">
+      <img src="logo2.png" alt="Italac" class="logo-img">
+    </div>
+
+    <div class="card login-card">
+      <h3 class="navy-text">Acesse a Intranet</h3>
+      <p class="sub-text">Use seu e-mail corporativo @italac.com.br</p>
+      <form id="login-form">
+        <label for="login-email">E-mail corporativo</label>
+        <input id="login-email" type="email" placeholder="nome.sobrenome@italac.com.br" required>
+
+        <label for="login-pass">Senha (mínimo 6 dígitos)</label>
+        <div class="pass-wrap">
+          <input id="login-pass" type="password" placeholder="••••••" minlength="6" required>
+          <button type="button" class="eye" onclick="togglePass()">👁</button>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block">Entrar</button>
+      </form>
+      <p id="login-err" class="error-text hidden"></p>
+    </div>
+
+    <div class="test-accounts">
+      <h4>🔑 Contas de teste</h4>
+      <button onclick="fillLogin('admin@italac.com.br','admin123')">
+        <span>admin@italac.com.br / admin123</span><b>Admin</b></button>
+      <button onclick="fillLogin('isabela.alves@italac.com.br','123456')">
+        <span>isabela.alves@italac.com.br / 123456</span><b>Isabela — Analista de Marketing</b></button>
+      <button onclick="fillLogin('camila.torres@italac.com.br','123456')">
+        <span>camila.torres@italac.com.br / 123456</span><b>Gerente de RH</b></button>
+      <button onclick="fillLogin('helena.duarte@italac.com.br','123456')">
+        <span>helena.duarte@italac.com.br / 123456</span><b>Diretora</b></button>
+      <button onclick="fillLogin('joao.silva@italac.com.br','123456')">
+        <span>joao.silva@italac.com.br / 123456</span><b>Assistente (restrições)</b></button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== APLICAÇÃO ==================== -->
+<div id="app" class="hidden">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="logo-wrap" id="logo-side"></div>
+    <nav id="nav"></nav>
+    <div class="sidebar-foot">
+      <div class="social-row" id="social-side"></div>
+      <button class="btn btn-ghost btn-sm btn-block" onclick="startTour()">🧭 Guia da Intranet</button>
+    </div>
+  </aside>
+
+  <!-- Conteúdo principal -->
+  <div class="main">
+
+    <!-- Topbar -->
+    <div class="topbar">
+      <button class="btn btn-ghost btn-sm" id="hamb" onclick="toggleSidebar()">☰</button>
+      <div id="logo-top"></div>
+      <div class="search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="global-search" placeholder="Buscar documentos, pessoas, normas..."
+               onkeydown="if(event.key==='Enter')doSearch()">
+      </div>
+      <div class="top-tools">
+        <span class="clock" id="clock"></span>
+        <button class="bell" onclick="showNotifs()">🔔<span class="dot" id="notif-dot"></span></button>
+        <div class="menu-wrap">
+          <button class="avatar-btn" id="avatar-btn"
+                  onclick="document.getElementById('user-dd').classList.toggle('on')"></button>
+          <div class="dropdown" id="user-dd">
+            <button onclick="showPage('perfil');ddOff()">👤 Meu Perfil</button>
+            <button class="danger-text" onclick="logout()">⏻ Sair</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Páginas (renderizadas pelo app.js) -->
+    <div class="content" id="content"></div>
+
+    <!-- Rodapé -->
+    <div class="footer-pad">
+      <footer class="site" id="site-footer"></footer>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== MODAL / TOAST / TOUR ==================== -->
+<div class="modal-bg" id="modal-bg" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modal"></div>
+</div>
+<div id="toast-wrap"></div>
+<div id="tour-overlay" class="hidden">
+  <div class="tour-card">
+    <div class="tour-step" id="tour-step-indicator"></div>
+    <h3 id="tour-title"></h3>
+    <p id="tour-desc"></p>
+    <div class="tour-actions">
+      <button class="btn btn-ghost btn-sm" onclick="skipTour()">Pular</button>
+      <button class="btn btn-primary btn-sm" id="tour-next" onclick="nextTourStep()">Próximo</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
