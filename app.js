@@ -291,6 +291,7 @@ const PAGES = [
   ['inicio',' <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>','Início'],
   ['comunicacao','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>','Comunicação'],
   ['documentos','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>','Políticas e Normas'],
+  ['calendario','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>','Calendário'],
   ['departamentos','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>','Departamentos'],
   ['perfil','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>','Minha Conta'],
   ['treinamentos','<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>','Treinamentos'],
@@ -334,7 +335,8 @@ function renderPage(){
     inicio:pInicio, comunicacao:pComunicacao, documentos:pDocumentos,
     departamentos:pDepartamentos, perfil:pPerfil, treinamentos:pTreinamentos,
     rh:pRH, sustentabilidade:pSust, ideias:pIdeias, vagas:pVagas,
-    ferramentas:pFerr, historia:pHist, admin:pAdmin
+    ferramentas:pFerr, historia:pHist, admin:pAdmin,
+    calendario:pCalendario
   };
   document.getElementById('content').innerHTML =
     '<div class="page on">' + (H[currentPage] || pInicio)() + '</div>';
@@ -366,7 +368,40 @@ function startApp(){
 
   if(!get(K.TOUR)) setTimeout(startTour, 600);
 }
+/* Feriados nacionais fixos (MM-DD) + ponto facultativo do servidor público */
+const CAL_FERIADOS_FIXOS = {
+  '01-01':'Confraternização Universal',
+  '04-21':'Tiradentes',
+  '05-01':'Dia do Trabalho',
+  '09-07':'Independência do Brasil',
+  '10-12':'Nossa Senhora Aparecida',
+  '10-28':'Dia do Servidor Público*',
+  '11-02':'Finados',
+  '11-15':'Proclamação da República',
+  '11-20':'Dia da Consciência Negra',
+  '12-25':'Natal'
+};
 
+/* Datas móveis: Carnaval, Sexta-Feira Santa e Corpus Christi a partir da Páscoa (algoritmo de Gauss) */
+function calFeriados(ano){
+  const out = {};
+  Object.keys(CAL_FERIADOS_FIXOS).forEach(k => out[ano + '-' + k] = CAL_FERIADOS_FIXOS[k]);
+  const a = ano % 19, b = Math.floor(ano/100), c = ano % 100;
+  const d = Math.floor(b/4), e = b % 4, f = Math.floor((b+8)/25), g = Math.floor((b-f+1)/3);
+  const h = (19*a + b - d - g + 15) % 30, i = Math.floor(c/4), k = c % 4;
+  const l = (32 + 2*e + 2*i - h - k) % 7, m = Math.floor((a + 11*h + 22*l)/451);
+  const mesP = Math.floor((h + l - 7*m + 114)/31), diaP = ((h + l - 7*m + 114) % 31) + 1;
+  const pascoa = new Date(ano, mesP - 1, diaP);
+  const add = (dias, nome) => {
+    const dt = new Date(pascoa.getTime() + dias*86400000);
+    out[dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0')] = nome;
+  };
+  add(-48, 'Carnaval');
+  add(-47, 'Carnaval');
+  add(-2, 'Sexta-Feira Santa');
+  add(60, 'Corpus Christi');
+  return out;
+}
 /* ================= 9. RELÓGIO E NOTIFICAÇÕES ================= */
 function startClock(){
   const tick = () => {
@@ -875,9 +910,270 @@ function denyReq(reqId){
   closeModal(); renderPage(); updateBadge();
   toast('Solicitação negada.', 'warn');
 }
+/* ================= PÁGINA: CALENDÁRIO DA EMPRESA ================= */
+let calY, calM, calOn = {};
+const CAL_TIPOS = ['Tecnologia & TI','Marketing','Financeiro','RH','Comercial','Qualidade','Operações'];
+const CAL_MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const CAL_CORES = {
+  'Tecnologia & TI':'#0A66C2',
+  'Marketing':'#e91e63',
+  'Financeiro':'#2e7d32',
+  'RH':'#8e24aa',
+  'Comercial':'#f39c12',
+  'Qualidade':'#00a99d',
+  'Operações':'#607d8b'
+};
+function calInit(){ const h = new Date(); calY = h.getFullYear(); calM = h.getMonth(); }
+calInit();
 
+function canCal(){
+  const u = me();
+  return isAdm(u) || (u.cargo && /gerente|diretor/i.test(u.cargo)) || (RANK[u.role] || 0) >= 2;
+}
+
+function calAtivos(){ return CAL_TIPOS.filter(t => calOn[t]); }
+
+function calToggle(t){
+  if(t === 'Todos'){
+    const todasOn = CAL_TIPOS.every(k => calOn[k]);
+    CAL_TIPOS.forEach(k => calOn[k] = !todasOn);
+  } else {
+    calOn[t] = !calOn[t];
+  }
+  renderPage();
+}
+
+function calNav(d){
+  calM += d;
+  if(calM < 0){ calM = 11; calY--; }
+  if(calM > 11){ calM = 0; calY++; }
+  renderPage();
+}
+function calHoje(){ const h = new Date(); calY = h.getFullYear(); calM = h.getMonth(); renderPage(); }
+function calHora(dt){ return dt ? dt.slice(11,16) : ''; }
+
+function calFmt(dt){
+  if(!dt) return '';
+  const [d, h] = dt.split('T');
+  const [a, m, dd] = d.split('-');
+  return dd + '/' + m + '/' + a + (h ? ' às ' + h.slice(0,5) : '');
+}
+
+function calAutorNome(email){
+  if(!email) return '—';
+  const u = get(K.U, []).find(x => x.email === email);
+  return u ? (u.nomeCompleto || email) : email;
+}
+function calGridBody(evs, mostraEvs){
+  const FER = calFeriados(calY);
+  const first = new Date(calY, calM, 1);
+  const dias = new Date(calY, calM + 1, 0).getDate();
+  const lead = first.getDay();
+  const hj = new Date();
+  const hojeStr = calY + '-' + String(calM + 1).padStart(2,'0') + '-' + String(hj.getDate()).padStart(2,'0');
+  const celulas = [];
+  for(let i = 0; i < lead; i++) celulas.push('<td class="cal-vazio"></td>');
+  for(let d = 1; d <= dias; d++){
+    const ds = calY + '-' + String(calM + 1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    const wd = new Date(calY, calM, d).getDay();
+    const fds = wd === 0 || wd === 6;
+    const fer = FER[ds];
+    const diaEvs = mostraEvs
+      ? evs.filter(e => e.inicio && ds >= e.inicio.slice(0,10) && ds <= (e.fim || e.inicio).slice(0,10))
+      : [];
+    let cls = 'cal-dia';
+    if(ds === hojeStr) cls += ' hoje';
+    if(fds) cls += ' fds';
+    if(fer) cls += ' feriado';
+    celulas.push('<td class="' + cls + '">' +
+      '<div class="cal-num">' + d + '</div>' +
+(fer ? '<button class="cal-hol" title="' + esc(fer) + '" onclick="calFeriadoVer(\'' + ds + '\')">' + esc(fer) + '</button>' : '') +      diaEvs.slice(0,3).map(e =>
+        '<button class="cal-chip" style="background:' + (CAL_CORES[e.tipo] || '#010a8f') + '" onclick="calVer(\'' + e.id + '\')">' +
+        calHora(e.inicio) + ' · ' + esc(e.nome) + '</button>').join('') +
+      (diaEvs.length > 3 ? '<button class="cal-mais" onclick="calDia(\'' + ds + '\')">+' + (diaEvs.length - 3) + ' mais</button>' : '') +
+    '</td>');
+  }
+  while(celulas.length % 7 !== 0) celulas.push('<td class="cal-vazio"></td>');
+  let rows = '';
+  for(let i = 0; i < celulas.length; i += 7){
+    rows += '<tr>' + celulas.slice(i, i + 7).join('') + '</tr>';
+  }
+  return rows;
+}
+
+function pCalendario(){
+  const u = me(), can = canCal();
+  const evs = get('italac_calendar', []);
+  const ativos = calAtivos();
+  const temFiltro = ativos.length > 0;
+  const temTodos = evs.some(e => e.tipo === 'Todos');
+  const visiveis = evs.filter(e => e.tipo === 'Todos' || ativos.includes(e.tipo));
+
+  const pills = ['Todos'].concat(CAL_TIPOS).map(t => {
+    const on = t === 'Todos' ? ativos.length === CAL_TIPOS.length : calOn[t];
+    const dot = t !== 'Todos' ? '<span class="cal-dot" style="background:' + (CAL_CORES[t] || '#0A66C2') + '"></span>' : '';
+    return '<button class="cal-pill' + (on ? ' on' : '') + '" onclick="calToggle(\'' + t + '\')">' + dot + t + '</button>';
+  }).join('');
+
+  const headDias = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(d => '<th>' + d + '</th>').join('');
+  const grid = calGridBody(visiveis, temFiltro || temTodos);
+
+  const hj = new Date();
+  const hjStr = hj.getFullYear() + '-' + String(hj.getMonth()+1).padStart(2,'0') + '-' + String(hj.getDate()).padStart(2,'0') + 'T00:00';
+  const proximos = visiveis.filter(e => (e.fim || e.inicio) >= hjStr)
+    .sort((a,b) => a.inicio.localeCompare(b.inicio));
+
+  const estadoFiltro = temFiltro ? ativos.join(' + ') : (temTodos ? 'Todos' : '');
+
+  return '<h2 class="sec">📅 Calendário da Empresa' +
+    (can ? ' <button class="btn btn-primary btn-sm" onclick="calForm()">+ Novo Evento</button>' : '') + '</h2>' +
+    '<div class="cal-pills">' + pills + '</div>' +
+    '<div class="cal-nav">' +
+      '<button class="btn btn-ghost btn-sm" onclick="calNav(-1)">← ' + CAL_MESES[(calM + 11) % 12].slice(0,3) + '</button>' +
+      '<span class="cal-month">' + CAL_MESES[calM] + ' ' + calY + '</span>' +
+      '<button class="btn btn-ghost btn-sm" onclick="calNav(1)">' + CAL_MESES[(calM + 1) % 12].slice(0,3) + ' →</button>' +
+      '<button class="btn btn-ghost btn-sm" onclick="calHoje()">Hoje</button>' +
+    '</div>' +
+    '<div class="cal-wrap"><table class="cal-grid"><thead><tr>' + headDias + '</tr></thead><tbody>' + grid + '</tbody></table></div>' +
+    '<div class="cal-legenda">' +
+      '<span><i class="leg fds"></i>Fim de semana (não útil)</span>' +
+      (estadoFiltro ? '<span class="lmeta">Eventos exibidos: ' + estadoFiltro + '</span>' : '<span class="lmeta">Ative os filtros para ver os eventos</span>') +
+    '</div>' +
+    '<h3 class="sec" style="font-size:1.05rem;margin-top:20px">🗓️ Próximos eventos' +
+      (estadoFiltro ? ' • ' + estadoFiltro : '') + '</h3>' +
+    (proximos.length ?
+      '<div class="cal-list">' + proximos.map(e =>
+        '<div class="cal-item" style="border-left-color:' + (CAL_CORES[e.tipo] || '#010a8f') + '" onclick="calVer(\'' + e.id + '\')">' +
+          '<div style="flex:1;min-width:200px">' +
+            '<b>' + esc(e.nome) + '</b>' +
+            '<div class="meta">📅 ' + calFmt(e.inicio) + (e.fim && e.fim !== e.inicio ? ' → ' + calFmt(e.fim) : '') +
+              (e.local ? ' • 📍 ' + esc(e.local) : '') + ' • 🏷️ ' + esc(e.tipo) + '</div>' +
+            '<div class="meta">👤 Adicionado por ' + esc(calAutorNome(e.autor)) + '</div>' +
+          '</div>' +
+          (can ?
+            '<div class="acts">' +
+              '<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();calForm(\'' + e.id + '\')">✏️ Atualizar</button>' +
+              '<button class="btn btn-ghost btn-sm" style="color:#c0392b" onclick="event.stopPropagation();calDel(\'' + e.id + '\')">🗑 Excluir</button>' +
+            '</div>' : '') +
+        '</div>').join('') + '</div>' :
+      '<p class="meta">Nenhum evento futuro com os filtros ativos.</p>');
+}
+
+function calForm(id){
+  const e = get('italac_calendar', []).find(x => x.id === id) || {};
+  const u = me();
+  openModal('<h3>' + (id ? '✏️ Atualizar Evento' : '➕ Novo Evento no Calendário') + '</h3>' +
+    '<label>Nome do evento</label><input id="k-nome" value="' + esc(e.nome || '') + '" placeholder="Ex.: Reunião de planejamento">' +
+    '<label>Tipo (filtro)</label><select id="k-tipo">'+
+      '<option value="Todos"' + (e.tipo === 'Todos' ? ' selected' : '') + '>Todos</option>' +
+      CAL_TIPOS.map(t =>
+      '<option' + (e.tipo === t ? ' selected' : '') + '>' + t + '</option>').join('') + '</select>' +
+    '<div class="grid2" style="grid-template-columns:1fr 1fr;gap:10px">' +
+      '<div><label>Data e hora de início</label><input type="datetime-local" id="k-ini" value="' + esc(e.inicio || '') + '"></div>' +
+      '<div><label>Data e hora de fim</label><input type="datetime-local" id="k-fim" value="' + esc(e.fim || '') + '"></div>' +
+    '</div>' +
+    '<label>Local (opcional)</label><input id="k-local" value="' + esc(e.local || '') + '" placeholder="Ex.: Sala 2, Matriz Goiânia">' +
+    '<label>Responsável (quem adicionou)</label><input value="' + esc(id ? calAutorNome(e.autor) : (u.nomeCompleto || u.email)) + '" disabled>' +
+    (id ? '<input type="hidden" id="k-autor" value="' + esc(e.autor || '') + '">' : '') +
+    '<label>Descrição (opcional)</label><textarea id="k-desc" rows="3" placeholder="Pauta, participantes, observações...">' + esc(e.desc || '') + '</textarea>' +
+    '<button class="btn btn-primary" style="margin-top:14px" onclick="calSave(\'' + (id || '') + '\')">' + (id ? 'Salvar alterações' : 'Adicionar ao calendário') + '</button>');
+}
+
+function calSave(id){
+  const u = me();
+  const nome = v('k-nome').trim();
+  const ini = v('k-ini'), fim = v('k-fim');
+  if(!nome){ toast('Informe o nome do evento.', 'err'); return; }
+  if(!ini || !fim){ toast('Informe a data de início e de fim.', 'err'); return; }
+  if(fim < ini){ toast('A data de fim não pode ser anterior à de início.', 'err'); return; }
+  const list = get('italac_calendar', []);
+  const o = { id: id || uid(), nome: nome, tipo: v('k-tipo'), inicio: ini, fim: fim,
+    local: v('k-local').trim(), autor: id ? (v('k-autor') || u.email) : u.email, desc: v('k-desc').trim() };
+  if(id){ set('italac_calendar', list.map(x => x.id === id ? o : x)); toast('Evento atualizado.', 'ok'); }
+  else{ list.push(o); set('italac_calendar', list); toast('Evento adicionado ao calendário!', 'ok'); }
+  closeModal(); renderPage();
+}
+
+function calDel(id){
+  const e = get('italac_calendar', []).find(x => x.id === id); if(!e) return;
+  if(!confirm('Excluir "' + e.nome + '" do calendário? Essa ação não pode ser desfeita.')) return;
+  set('italac_calendar', get('italac_calendar', []).filter(x => x.id !== id));
+  closeModal(); toast('Evento excluído.', 'ok'); renderPage();
+}
+function calDataLonga(dt){
+  if(!dt) return '';
+  const p = dt.slice(0,10).split('-');
+  const meses = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  return parseInt(p[2], 10) + ' de ' + meses[parseInt(p[1], 10) - 1] + ' de ' + p[0];
+}
+
+function calVer(id){
+  const e = get('italac_calendar', []).find(x => x.id === id); if(!e) return;
+  const can = canCal();
+const CAL_CORES = {
+  'Tecnologia & TI':'#d9edff',
+  'Marketing':'#f8d7da',
+  'Financeiro':'#d4edda',
+  'RH':'#e2d9f3',
+  'Comercial':'#fff3cd',
+  'Qualidade':'#d1e7dd',
+  'Operações':'#e2e8f0'
+};
+  const ini = calDataLonga(e.inicio);
+  const fim = e.fim && e.fim !== e.inicio ? calDataLonga(e.fim) : '';
+  const temHora = e.inicio && e.inicio.slice(11,16) !== '00:00';
+  const linhas =
+    '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f2f5">' +
+      '<span style="font-size:1rem">📅</span><span style="font-size:.88rem;color:#1e293b">' +
+      esc(ini + (fim ? ' – ' + fim : '')) + (temHora ? ' às ' + esc(e.inicio.slice(11,16)) : '') + '</span></div>' +
+    '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f2f5">' +
+      '<span style="font-size:1rem">📍</span><span style="font-size:.88rem;color:#1e293b">' + esc(e.local || '—') + '</span></div>' +
+    '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f2f5">' +
+      '<span style="font-size:1rem">👤</span><span style="font-size:.88rem;color:#1e293b">' + esc(calAutorNome(e.autor) || '—') + '</span></div>' +
+    (e.desc ? '<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid #f0f2f5">' +
+      '<span style="font-size:1rem">💬</span><span style="font-size:.88rem;color:#1e293b">' + esc(e.desc) + '</span></div>' : '');
+  openModal(
+    '<div style="background:' + cor + ';border-radius:10px 10px 0 0;padding:14px 16px;position:relative">' +
+      '<span style="display:inline-block;background:rgba(255,255,255,.22);color:#fff;font-size:.62rem;font-weight:800;letter-spacing:.4px;padding:3px 9px;border-radius:99px;text-transform:uppercase">🏷️ ' + esc(e.tipo) + '</span>' +
+      '<button onclick="closeModal()" style="position:absolute;top:10px;right:12px;background:transparent;border:none;color:#fff;font-size:1rem;cursor:pointer;font-weight:700" aria-label="Fechar">✕</button>' +
+      '<h3 style="color:#fff;margin:10px 0 0;font-size:1.15rem">' + esc(e.nome) + '</h3>' +
+    '</div>' +
+    '<div style="background:#fff;border-radius:0 0 10px 10px;padding:4px 16px 16px">' + linhas +
+      (can ? '<div style="display:flex;gap:8px;padding-top:14px">' +
+        '<button class="btn btn-primary btn-sm" onclick="calForm(\'' + e.id + '\')">✏️ Atualizar</button>' +
+        '<button class="btn btn-ghost btn-sm" style="color:#c0392b" onclick="calDel(\'' + e.id + '\')">🗑 Excluir</button>' +
+      '</div>' : '') +
+    '</div>');
+}
+
+function calDia(ds){
+  const evs = get('italac_calendar', []).filter(e => e.inicio && ds >= e.inicio.slice(0,10) && ds <= (e.fim || e.inicio).slice(0,10));
+  openModal('<h3>📅 ' + ds.split('-').reverse().join('/') + '</h3>' +
+    (evs.length ? evs.map(e =>
+      '<div class="cal-item" style="border-left-color:' + (CAL_CORES[e.tipo] || '#0A66C2') + ';margin-bottom:8px;cursor:pointer" onclick="calVer(\'' + e.id + '\')">' +
+        '<div style="flex:1;min-width:180px"><b>' + esc(e.nome) + '</b><div class="meta">' + calHora(e.inicio) + (e.fim && e.fim !== e.inicio ? ' – ' + calHora(e.fim) : '') + ' • ' + esc(e.tipo) + '</div></div>' +
+      '</div>').join('') : '<p class="meta">Nenhum evento neste dia.</p>'));
+}
+function calFeriadoVer(ds){
+  const FER = calFeriados(calY);
+  const nome = FER[ds];
+  if(!nome) return;
+  const p = ds.split('-');
+  const dataFmt = p[2] + '/' + p[1] + '/' + p[0];
+  const wd = new Date(calY, parseInt(p[1]) - 1, parseInt(p[2])).getDay();
+  const diasSemana = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
+  const ehFacultativo = nome.indexOf('*') >= 0;
+  openModal(
+    '<div style="background:#fd5000;border-radius:10px;padding:14px 16px;margin-bottom:14px">' +
+      '<span style="display:inline-block;background:rgba(255,255,255,.22);color:#fff;font-size:.64rem;font-weight:800;letter-spacing:.4px;padding:3px 9px;border-radius:99px;text-transform:uppercase">' + (ehFacultativo ? 'Ponto facultativo' : 'Feriado nacional') + '</span>' +
+      '<h3 style="color:#fff;margin:8px 0 0">🎉 ' + esc(nome.replace('*','')) + '</h3>' +
+    '</div>' +
+    '<p style="margin:0 0 8px;font-size:.9rem"><b>Data:</b> ' + dataFmt + ' (' + diasSemana[wd] + ')</p>' +
+    '<p class="sub-text" style="margin:4px 0"><b>Expediente:</b> ' + (ehFacultativo ? 'Ponto facultativo, verifique a escala da sua área.' : 'Não é dia útil, não há expediente de trabalho.') + '</p>');
+}
 /* ================= 14. PÁGINA: DEPARTAMENTOS ================= */
 let fac = 'goiania';
+let depSetor = 'Todos';
 const ORG = {
   goiania:{ n:'Goiânia (Matriz)', dir:'Helena Duarte — Diretora de Operações',
     m:[['Camila Torres','Gerente de RH','RH'],['Rafael Mendes','Gerente Industrial','Produção'],['Marcos Lopes','Gerente de TI','TI']],
@@ -892,26 +1188,48 @@ const ORG = {
     m:[['Bruno Tavares','Gerente de Manutenção']],
     a:[['Diego Fontes','Técnico de Manutenção']] }
 };
-
+function pertenceFac(u, o, k){
+  if(u.fac) return u.fac === k;
+  if(!u.unidade) return true;
+  const un = String(u.unidade).toLowerCase();
+  const nome = o.n.toLowerCase();
+  return nome.includes(un) || un.includes(nome) || un === k;
+}
 function pDepartamentos(){
   const o = ORG[fac];
-  return '<h2 class="sec"><span class="train-accent-des"></span>  Estrutura Organizacional</h2>' +
+  const todos = get(K.U, []);
+  const setores = ['Todos'].concat(Array.from(new Set(todos
+    .filter(u => u.setor && pertenceFac(u, o, fac))
+    .map(u => u.setor))).sort());
+  const equipe = todos.filter(u =>
+    pertenceFac(u, o, fac) &&
+    (depSetor === 'Todos' || u.setor === depSetor));
+
+  function usrCard(u){
+    const nome = u.nomeCompleto || u.email || 'Colaborador';
+    const pref = u.nomePref || nome.split(' ')[0];
+    const cargo = u.cargo || u.role || 'Colaborador';
+    return '<div class="usr-card">' +
+      (u.foto ?
+        '<img class="usr-av" src="' + esc(u.foto) + '" alt="' + esc(pref) + '">' :
+        '<div class="usr-av">' + initials(nome) + '</div>') +
+      '<div class="usr-info">' +
+        '<b>' + esc(nome) + '</b>' +
+        (u.nomePref ? '<span class="usr-pref">' + esc(u.nomePref) + '</span>' : '') +
+        '<span class="usr-role">' + esc(cargo) + ' • ' + esc(u.setor || 'Sem setor') + '</span>' +
+        '<a class="usr-mail" href="mailto:' + esc(u.email || '') + '">' + esc(u.email || '') + '</a>' +
+      '</div></div>';
+  }
+
+  return '<h2 class="sec"><span class="train-accent-des"></span>  Colaboradores</h2>' +
     '<div class="tools-row">' + Object.entries(ORG).map(([k,val]) =>
       '<button class="factory-btn' + (fac === k ? ' active' : '') +
-      '" onclick="fac=\'' + k + '\';renderPage()">' + val.n + '</button>').join('') + '</div>' +
-    '<div class="card" style="text-align:center">' +
-      '<div class="org" style="background:var(--navy);color:#fff"><b>' + esc(o.dir) +
-      '</b><div class="r" style="color:#B9CBE8">Diretoria</div></div>' +
-      '<div class="vline"></div>' +
-      '<div class="org-row">' + o.m.map(m =>
-        '<div class="org"><b>' + esc(m[0]) + '</b><div class="r">' + esc(m[1]) + ' • ' + esc(m[2] || '') + '</div></div>').join('') + '</div>' +
-      '<div class="vline" style="background:var(--line)"></div>' +
-      '<div class="org-row">' + o.a.map(a =>
-        '<div class="org" style="border-color:var(--sky)"><b style="font-size:.85rem">' + esc(a[0]) +
-        '</b><div class="r">' + esc(a[1]) + '</div></div>').join('') + '</div>' +
-    '</div>';
+      '" onclick="fac=\'' + k + '\';depSetor=\'Todos\';renderPage()">' + val.n + '</button>').join('') + '</div>' +
+    '<div class="dep-pills">' + setores.map(s =>
+      '<button class="dep-pill' + (depSetor === s ? ' active' : '') +
+      '" onclick="depSetor=\'' + s + '\';renderPage()">' + s + '</button>').join('') + '</div>' +
+    '<div class="dep-grid">' + equipe.map(usrCard).join('') + '</div>';
 }
-
 /* ================= 15. PÁGINA: MINHA CONTA (PERFIL) ================= */
 function pPerfil(){
   const u = me();
