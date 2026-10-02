@@ -481,7 +481,7 @@ function pInicio(){
       '<div><h2 class="sec"><span class="train-accent-des"></span>Destaque Corporativo</h2>' +
         (principal ? cardNoticia(principal, 'feat')
           : '<div class="card""><p class="meta" style="margin:0">Nenhuma notícia destacada.</p>' +
-            '<p class="sub-text" style="font-size:.78rem;margin-top:6px">Vá em Comunicação → Notícias da Empresa e use ★ Destacar.</p></div>') +
+            '<p class="sub-text" style="font-size:.78rem;margin-top:6px">Veja outras Noticias abaixo!</p></div>') +
       '</div>' +
       '<div class="card"><h3 class="navy-text" style="font-size:1rem;margin-bottom:10px"> Aniversariantes do Mês (Outubro)</h3>' +
         bd.map(b =>
