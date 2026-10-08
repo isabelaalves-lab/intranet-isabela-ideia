@@ -956,3 +956,6 @@ h2.sec-rh-aprov{
 .perm-user-grid input[type=checkbox]{width:15px;height:15px;flex:0 0 auto;margin:0;accent-color:#0f2a5e;cursor:pointer}
 .ferr-card.locked{opacity:.75;border:1px dashed #cbd5e1;background:#f8fafc}
 .ferr-card.locked .btn-navy-block{background:#94a3b8;cursor:not-allowed}
+.usr-card.usr-clicavel{cursor:pointer;transition:transform .15s, box-shadow .15s;}
+.usr-card.usr-clicavel:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(15,42,94,.12)}
+.usr-edit{display:block;font-size:.72rem;color:#0f2a5e;font-weight:700;margin-top:4px}

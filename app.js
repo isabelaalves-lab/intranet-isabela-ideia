@@ -352,9 +352,14 @@ function renderPage(){
     'intra-jur':function(){ return pIntranetSetor('juridico'); },
     'intra-log':function(){ return pIntranetSetor('logistica'); }
   };
+    if(!H[currentPage] && typeof intraList === 'function'){
+    const alvo = intraList().find(x => (x.rota || 'intra-' + x.key) === currentPage);
+    if(alvo){ document.getElementById('content').innerHTML = '<div class="page on">' + pIntranetSetor(alvo.key) + '</div>'; updateBadge(); return; }
+  }
   document.getElementById('content').innerHTML =
     '<div class="page on">' + (H[currentPage] || pInicio)() + '</div>';
   updateBadge();
+  
 }
 
 function startApp(){
@@ -440,6 +445,7 @@ function pendingFor(u){
   /* Ocorrências aprovadas pelo gerente aguardando RH */
   if((u.setor === 'RH' && u.role === 'gerente') || isAdm(u))
     n += get(K.O, []).filter(o => o.status === 'APROVADA_GERENTE').length;
+  if(canComm(u)) n += get(K.C, []).filter(c => c.status === 'rascunho').length;
   return n;
 }
 
@@ -515,27 +521,122 @@ function abreNotif(idx){
 }
 
 /* ================= 10. BUSCA GLOBAL ================= */
+const ROTAS_BUSCA = [
+  ['holerite','rh'],['ponto','rh'],['ocorrencia','rh'],['vaga','rh'],
+  ['documento','documentos'],['política','documentos'],['norma','documentos'],
+  ['treinamento','treinamentos'],['bpf','treinamentos'],['nr-12','treinamentos'],
+  ['comunicação','comunicacao'],['notícia','comunicacao'],['tv','comunicacao'],
+  ['vaga','vagas'],['candidato','vagas'],
+  ['sustentabilidade','sustentabilidade'],['reciclagem','sustentabilidade'],
+  ['ideia','ideias'],['inovação','ideias'],
+  ['sap','ferramentas'],['power bi','ferramentas'],['fluig','ferramentas'],
+  ['organograma','departamentos'],['fábrica','departamentos'],
+  ['história','historia'],['perfil','perfil'],['conta','perfil']
+];
+const ROTULO_BUSCA = {
+  'rh':'Recursos Humanos','documentos':'Documentos','treinamentos':'Treinamentos',
+  'comunicacao':'Comunicação','vagas':'Vagas','sustentabilidade':'Sustentabilidade',
+  'ideias':'Caixa de Ideias','ferramentas':'Ferramentas','departamentos':'Departamentos',
+  'historia':'História','perfil':'Meu Perfil'
+};
+const ICONE_BUSCA = {
+  'rh':'👥','documentos':'📄','treinamentos':'📚','comunicacao':'📣',
+  'vagas':'💼','sustentabilidade':'🌱','ideias':'💡','ferramentas':'🛠️',
+  'departamentos':'🏢','historia':'🏛️','perfil':'👤'
+};
+
+let gsInp = null, gsBox = null;
+
+function listaSugestoes(q){
+  const vistos = {}, out = [];
+  ROTAS_BUSCA.forEach(r => {
+    if(vistos[r[0]]) return;
+    vistos[r[0]] = true;
+    out.push({ k:r[0], p:r[1], ic:ICONE_BUSCA[r[1]] || '🔎' });
+  });
+  if(q) return out.filter(s => s.k.toLowerCase().includes(q.toLowerCase())).slice(0, 8);
+  return out.slice(0, 8);
+}
+
+function hideSugestoes(){
+  if(gsBox) gsBox.style.display = 'none';
+}
+
+function posicionaSugestoes(){
+  if(!gsInp || !gsBox) return;
+  const r = gsInp.getBoundingClientRect();
+  gsBox.style.position = 'fixed';
+  gsBox.style.top = (r.bottom + 4) + 'px';
+  gsBox.style.left = r.left + 'px';
+  gsBox.style.width = r.width + 'px';
+}
+
+function renderSugestoes(q){
+  if(!gsBox) return;
+  const lista = listaSugestoes(q);
+  if(!lista.length){ hideSugestoes(); return; }
+  gsBox.innerHTML = lista.map(s =>
+    '<div class="gs-sug" data-k="' + s.k + '" onmousedown="event.preventDefault();gsEscolhe(this)">' +
+      '<span>' + s.ic + '</span>' +
+      '<div><b>' + esc(s.k) + '</b><small>Ir para ' + esc(ROTULO_BUSCA[s.p] || s.p) + '</small></div>' +
+    '</div>').join('');
+  posicionaSugestoes();
+  gsBox.style.display = 'block';
+}
+
+function gsEscolhe(el){
+  const k = el.getAttribute('data-k');
+  if(gsInp) gsInp.value = k;
+  hideSugestoes();
+  doSearch();
+}
+
+function injetaCSSBusca(){
+  if(document.getElementById('gs-css')) return;
+  const st = document.createElement('style');
+  st.id = 'gs-css';
+  st.textContent =
+    '#busca-sugestoes{display:none;background:#fff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 8px 24px rgba(15,42,94,.12);z-index:9999;overflow:hidden}' +
+    '.gs-sug{display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;border-bottom:1px solid #eef2f8}' +
+    '.gs-sug:last-child{border-bottom:none}' +
+    '.gs-sug:hover{background:#f0f4fb}' +
+    '.gs-sug > span{font-size:1rem}' +
+    '.gs-sug b{display:block;font-size:.82rem;color:#0f2a5e;text-transform:capitalize}' +
+    '.gs-sug small{display:block;font-size:.72rem;color:#64748b}';
+  document.head.appendChild(st);
+}
+
+function initBuscaSugestoes(){
+  const inp = document.getElementById('global-search');
+  if(!inp) return;
+  gsInp = inp;
+  inp.setAttribute('autocomplete', 'off');
+  const box = document.createElement('div');
+  box.id = 'busca-sugestoes';
+  document.body.appendChild(box);
+  gsBox = box;
+  injetaCSSBusca();
+  inp.addEventListener('input', function(){ renderSugestoes(this.value.trim()); });
+  inp.addEventListener('focus', function(){ renderSugestoes(this.value.trim()); });
+  inp.addEventListener('keydown', function(e){ if(e.key === 'Escape') hideSugestoes(); });
+  document.addEventListener('click', function(e){
+    if(gsInp && !gsInp.contains(e.target) && gsBox && !gsBox.contains(e.target)) hideSugestoes();
+  });
+  window.addEventListener('scroll', hideSugestoes, true);
+}
+
 function doSearch(){
   const q = document.getElementById('global-search').value.trim().toLowerCase();
   if(!q) return;
-  const routes = [
-    ['holerite','rh'],['ponto','rh'],['ocorr','rh'],['vaga','rh'],
-    ['documento','documentos'],['política','documentos'],['norma','documentos'],
-    ['treinamento','treinamentos'],['bpf','treinamentos'],['nr-12','treinamentos'],
-    ['comunic','comunicacao'],['notícia','comunicacao'],['tv','comunicacao'],
-    ['vaga','vagas'],['candidat','vagas'],
-    ['sustent','sustentabilidade'],['reciclagem','sustentabilidade'],
-    ['ideia','ideias'],['inova','ideias'],
-    ['sap','ferramentas'],['power bi','ferramentas'],['fluig','ferramentas'],
-    ['organo','departamentos'],['fábrica','departamentos'],
-    ['história','historia'],['perfil','perfil'],['conta','perfil']
-  ];
-  const hit = routes.find(r => q.includes(r[0]));
-  if(hit){ showPage(hit[1]); toast('Resultado encontrado em "' + hit[1] + '".', 'ok'); }
+  const hit = ROTAS_BUSCA.find(r => q.includes(r[0]));
+  if(hit){ showPage(hit[1]); toast('Resultado encontrado em "' + ROTULO_BUSCA[hit[1]] + '".', 'ok'); }
   else { toast('Nada encontrado para "' + q + '". Tente: holerite, BPF, vaga, ideia...', 'warn'); }
   document.getElementById('global-search').value = '';
+  hideSugestoes();
 }
-
+document.addEventListener('DOMContentLoaded', function(){
+  initBuscaSugestoes();
+});
 /* ================= 11. PÁGINA: INÍCIO ================= */
 function tenure(u){
   const d = new Date(u.ingresso || '2021-06-01');
@@ -545,7 +646,7 @@ function tenure(u){
 function pInicio(){
   const u = me();
   const can = isAdm(u) || (u.setor === 'Marketing' && RANK[u.role] >= 1);
-  const todas = get(K.C, []).filter(c => c.tab === 'empresa');
+const todas = get(K.C, []).filter(c => c.tab === 'empresa' && c.status !== 'rascunho');
   const principal = todas.find(c => c.dest) || null;
   const demais = todas.filter(c => c.id !== (principal ? principal.id : null));
   const visiveis = demais.slice(0, 3);                     // máximo de 3
@@ -611,34 +712,58 @@ function canComm(u){
 function pComunicacao(){
   const u = me(), can = canComm();
   const tabs = [['tv','TV Corporativa'],['mercado','Mercado Lácteo'],['empresa','Notícias da Empresa']];
-  const list = get(K.C, []).filter(c => c.tab === commTab)
-    .sort((a, b) => (a.dest === b.dest) ? 0 : (a.dest ? -1 : 1)); 
+  if(can) tabs.push(['rascunho','📝 Rascunhos']);
+  const list = get(K.C, []).filter(c =>
+    commTab === 'rascunho'
+      ? (can && c.status === 'rascunho')
+      : (c.status !== 'rascunho' && c.tab === commTab)
+  ).sort((a, b) => (a.dest === b.dest) ? 0 : (a.dest ? -1 : 1));
+
+  /* Paginação em blocos de 6 */
+  const qtd = commQtd[commTab] || 6;
+  const visiveis = list.slice(0, qtd);
+  const temMais = list.length > qtd;
+
   return '<h2 class="sec"><span class="train-accent-des"></span> Comunicação Corporativa' +
-    (can ? ' <button class="btn btn-primary btn-sm" onclick="commForm()">+ Nova Comunicação</button>' : '') + '</h2>' +
+    (can ? ' <button class="btn btn-primary btn-sm" onclick="commForm()">+ Nova Comunicação</button>' +
+      ' <button class="btn btn-ghost btn-sm" onclick="importarRascunhos()">📝 Importar rascunhos</button>' : '') + '</h2>' +
     '<div class="tabs">' + tabs.map(t =>
       '<button class="tab' + (commTab === t[0] ? ' active' : '') +
-      '" onclick="commTab=\'' + t[0] + '\';renderPage()">' + t[1] + '</button>').join('') + '</div>' +
+      '" onclick="commTab=\'' + t[0] + '\';commQtd[\'' + t[0] + '\']=6;renderPage()">' + t[1] + '</button>').join('') + '</div>' +
     '<div class="card" style="margin-bottom:16px"><b class="navy-text">Siga a Italac</b>' +
     '<p class="sub-text" style="margin:4px 0 10px">Acompanhe a marca nas redes oficiais, abrem em nova aba.</p>' +
     '<div class="social-row">' + SOCIAL.map(s =>
       '<a href="' + s.u + '" target="_blank" style="background:var(--navy)" title="' + s.n + '">' +
       '<svg viewBox="0 0 24 24"><path d="' + s.i + '"/></svg></a>').join('') + '</div></div>' +
     '<div class="gridcomunic">' +
-    (list.map(c =>
-      '<div class="feat-comunicacao' + (c.dest ? ' destacada' : '') + '">' +
+    (visiveis.map(c =>
+      '<div class="feat-comunicacao' + (c.dest ? ' destacada' : '') + '" style="cursor:pointer" onclick="openComm(\'' + c.id + '\')">' +
       (c.img ? '<img src="' + esc(c.img) + '" alt="' + esc(c.titulo) + '">' : '') +
       '<div class="feat-body">' +
+      (c.status === 'rascunho' ? '<span class="badge bg-sk">📝 Rascunho</span> ' : '') +
       (c.dest ? '<span class="badge bg-or">★ Destaque da Home</span> ' : '') +
-      '<span class="badge bg-sk">' + esc(c.tipo) + '</span> ' +
+      '<span class="badge bg-or">' + esc(c.tipo) + '</span> ' +
       '<span class="meta">' + esc(c.data) + (c.dur ? ' • ' + c.dur : '') + '</span>' +
       '<h4>' + esc(c.titulo) + '</h4><p>' + esc(c.conteudo) + '</p>' +
-      (podeEditarComunicacao(c) ?
-        (commTab === 'empresa' ?
-          '<button class="btn btn-ghost btn-sm" style="margin-top:8px;color:#e67e22" onclick="destaqueComm(\'' + c.id + '\')">' + (c.dest ? '★ Remover destaque' : '★ Destacar no Inicio') + '</button>' : '') +
-        '<button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="commForm(\'' + c.id + '\')">✏️ Editar</button>' +
-        '<button class="btn btn-ghost btn-sm" style="margin-top:8px;color:#c0392b" onclick="delComm(\'' + c.id + '\')">🗑 Excluir</button>' : '') +
+      (c.fonte ? '<div class="doc-size" style="margin-bottom:6px">Fonte: ' + esc(c.fonte) + '</div>' : '') +
+      (c.status === 'rascunho'
+        ? '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+          '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();publicarComm(\'' + c.id + '\')">✅ Publicar</button>' +
+          '<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();commForm(\'' + c.id + '\')">✏️ Editar</button>' +
+          '<button class="btn btn-ghost btn-sm" style="color:#c0392b" onclick="event.stopPropagation();delComm(\'' + c.id + '\')">🗑 Excluir</button>' +
+          '</div>'
+        : (podeEditarComunicacao(c) ?
+          (commTab === 'empresa' ?
+            '<button class="btn btn-ghost btn-sm" style="margin-top:8px;color:#e67e22" onclick="event.stopPropagation();destaqueComm(\'' + c.id + '\')">' + (c.dest ? '★ Remover destaque' : '★ Destacar no Inicio') + '</button>' : '') +
+          '<button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="event.stopPropagation();commForm(\'' + c.id + '\')">✏️ Editar</button>' +
+          '<button class="btn btn-ghost btn-sm" style="margin-top:8px;color:#c0392b" onclick="event.stopPropagation();delComm(\'' + c.id + '\')">🗑 Excluir</button>' : '')) +
       '</div></div>').join('') ||
-    '<p class="meta">Nenhuma publicação nesta aba.</p>');
+    '<p class="meta">Nenhuma publicação nesta aba.</p>') +
+    '</div>' +
+    (temMais ?
+      '<div style="text-align:center;margin-top:16px">' +
+      '<button class="btn btn-ghost" onclick="commVerMais()">Ver mais (' + (list.length - qtd) + ')</button>' +
+      '</div>' : '');
 }
 function commForm(id){
   const c = get(K.C, []).find(x => x.id === id) || {};
@@ -682,7 +807,9 @@ function saveComm(id){
     img:img, conteudo:conteudo,
     data: antiga.data || new Date().toLocaleDateString('pt-BR').slice(0,5),
     autor: antiga.autor || u.email,
-    dest: antiga.dest
+    dest: antiga.dest,
+    status: antiga.status || 'publicado',
+    fonte: antiga.fonte || ''
   };
   if(id){ set(K.C, list.map(x => x.id === id ? o : x)); toast('Comunicação atualizada.', 'ok'); }
   else  { list.unshift(o); set(K.C, list); toast('Comunicação publicada!', 'ok'); }
@@ -735,8 +862,92 @@ function openComm(id){
   openModal('<h3>' + esc(c.titulo) + '</h3><span class="badge bg-sk">' + esc(c.tipo) + '</span>' +
     (c.img ? '<img src="' + esc(c.img) + '" alt="' + esc(c.titulo) + '" style="width:100%;max-height:280px;object-fit:cover;border-radius:10px;margin-top:12px">' : '') +
     '<p style="margin-top:12px;font-size:.9rem">' + esc(c.conteudo) + '</p>');
+    (c.fonte ? '<p class="doc-size" style="margin-top:10px">Fonte: ' + esc(c.fonte) + '</p>' : '');
+}
+/* ================= RASCUNHOS DE NOTÍCIAS ================= */
+/* Abre o modal para colar o bloco JSON que a automação semanal entrega */
+function importarRascunhos(){
+  openModal('<h3>📝 Importar rascunhos da semana</h3>' +
+    '<p class="doc-size" style="margin:2px 0 8px">Cole aqui o bloco JSON gerado pela automação. Cada item vira um rascunho para você revisar.</p>' +
+    '<textarea id="dr-json" rows="10" style="width:100%" placeholder=\'[{"titulo":"...","tipo":"...","tab":"empresa","conteudo":"...","img":"","fonte":"..."}]\'></textarea>' +
+    '<button class="btn btn-primary" style="margin-top:10px" onclick="salvarRascunhos()">Importar rascunhos</button>');
 }
 
+function salvarRascunhos(){
+  let lista;
+  try { lista = JSON.parse(v('dr-json')); }
+  catch(e){ toast('JSON inválido. Verifique o bloco colado.', 'err'); return; }
+  if(!Array.isArray(lista) || !lista.length){ toast('Nenhum rascunho encontrado no bloco.', 'err'); return; }
+
+  const list = get(K.C, []);
+  lista.forEach(d => {
+    list.unshift({
+      id: uid(),
+      titulo: String(d.titulo || '').trim(),
+      tipo: d.tipo || 'Comunicação Interna',
+      tab: ['tv','mercado','empresa'].includes(d.tab) ? d.tab : 'empresa',
+      img: d.img || '',
+      conteudo: String(d.conteudo || '').trim(),
+      data: new Date().toLocaleDateString('pt-BR').slice(0,5),
+      autor: 'automacao-italac',
+      fonte: d.fonte || '',
+      status: 'rascunho'
+    });
+  });
+  set(K.C, list);
+  closeModal(); renderPage();
+  toast(lista.length + ' rascunho(s) importado(s) para revisão.', 'ok');
+}
+function importarLista(lista){
+  const list = get(K.C, []);
+  const chaves = new Set(list.map(c => (c.fonte || '') + '|' + c.titulo));
+  let novos = 0;
+  lista.forEach(d => {
+    const titulo = String(d.titulo || '').trim();
+    const chave = (d.fonte || '') + '|' + titulo;
+    if(!titulo || chaves.has(chave)) return;
+    chaves.add(chave);
+    list.unshift({
+      id: uid(),
+      titulo: titulo,
+      tipo: d.tipo || 'Comunicação Interna',
+      tab: ['tv','mercado','empresa'].includes(d.tab) ? d.tab : 'empresa',
+      img: d.img || '',
+      conteudo: String(d.conteudo || '').trim(),
+      data: new Date().toLocaleDateString('pt-BR').slice(0,5),
+      autor: 'automacao-italac',
+      fonte: d.fonte || '',
+      status: 'rascunho'
+    });
+    novos++;
+  });
+  set(K.C, list);
+  return novos;
+}
+/* Publica um rascunho depois da revisão */
+function publicarComm(id){
+  const list = get(K.C, []);
+  const alvo = list.find(c => c.id === id);
+  if(!alvo) return;
+  if(!podeEditarComunicacao(alvo)){ toast('Sem permissão para publicar.', 'err'); return; }
+  if(!alvo.img){
+    toast('Adicione uma imagem antes de publicar.', 'err');
+    commForm(id);
+    return;
+  }
+  set(K.C, list.map(c => c.id === id ? Object.assign({}, c, {status:'publicado'}) : c));
+  toast('Notícia publicada no canal oficial.', 'ok');
+  renderPage();
+}
+
+/* Paginação da Comunicação: blocos de 6 por aba */
+let commQtd = { tv: 6, mercado: 6, empresa: 6, rascunho: 6 };
+
+function commVerMais(){
+  const t = commTab || 'tv';
+  commQtd[t] = (commQtd[t] || 6) + 6;
+  renderPage();
+}
 /* ============================================================
    PARTE 2 CONTINUA A PARTIR DAQUI
    (documentos, departamentos, perfil, treinamentos, RH,
@@ -1248,6 +1459,11 @@ const ORG = {
     m:[['Bruno Tavares','Gerente de Manutenção']],
     a:[['Diego Fontes','Técnico de Manutenção']] }
 };
+
+function isAdmin(){
+  const u = me();
+  return !!(u && (u.role === 'admin' || (u.perms || {}).admin));
+}
 function pertenceFac(u, o, k){
   if(u.fac) return u.fac === k;
   if(!u.unidade) return true;
@@ -1258,26 +1474,28 @@ function pertenceFac(u, o, k){
 function pDepartamentos(){
   const o = ORG[fac];
   const todos = get(K.U, []);
+  const ehAdmin = isAdmin();
   const setores = ['Todos'].concat(Array.from(new Set(todos
     .filter(u => u.setor && pertenceFac(u, o, fac))
     .map(u => u.setor))).sort());
   const equipe = todos.filter(u =>
     pertenceFac(u, o, fac) &&
-    (depSetor === 'Todos' || depSetorCasa({ setor: depSetor }, u.setor)));
+    (depSetor === 'Todos' || depNorm(u.setor) === depNorm(depSetor)));
 
   function usrCard(u){
     const nome = u.nomeCompleto || u.email || 'Colaborador';
-    const pref = u.nomePref || nome.split(' ')[0];
+    const pref = u.nomePreferido || nome.split(' ')[0];
     const cargo = u.cargo || u.role || 'Colaborador';
-    return '<div class="usr-card">' +
+    return '<div class="usr-card' + (ehAdmin ? ' usr-clicavel' : '') + '"' +
+      (ehAdmin ? ' onclick="userForm(\'' + esc(u.email) + '\')" title="Clique para editar cadastro"' : '') + '>' +
       (u.foto ?
         '<img class="usr-av" src="' + esc(u.foto) + '" alt="' + esc(pref) + '">' :
         '<div class="usr-av">' + initials(nome) + '</div>') +
       '<div class="usr-info">' +
         '<b>' + esc(nome) + '</b>' +
-        (u.nomePref ? '<span class="usr-pref">' + esc(u.nomePref) + '</span>' : '') +
+        (u.nomePreferido ? '<span class="usr-pref">' + esc(u.nomePreferido) + '</span>' : '') +
         '<span class="usr-role">' + esc(cargo) + ' • ' + esc(u.setor || 'Sem setor') + '</span>' +
-        '<a class="usr-mail" href="mailto:' + esc(u.email || '') + '">' + esc(u.email || '') + '</a>' +
+        '<a class="usr-mail" href="mailto:' + esc(u.email || '') + '" onclick="event.stopPropagation()">' + esc(u.email || '') + '</a>' +
       '</div></div>';
   }
 
@@ -2302,7 +2520,8 @@ function pAdmin(){
     ['usuarios','👥 Todos os Usuários'],
     ['reqs','📥 Solicitações de acesso'],
     ['perms','🔐 Permissões por setor e cargo'],
-    ['docs','📚 Normas & Documentos']
+    ['docs','📚 Normas & Documentos'],
+    ['intranets','🛠️ Intranets'],
   ]);
   setTimeout(admBody, 0);
   return '<h2 class="sec"><span class="train-accent-des"></span>Painel do Administrador</h2>' +
@@ -2355,8 +2574,8 @@ function userForm(email){
           '<h4 style="margin:14px 0 4px;font-size:.9rem;color:var(--navy)">🌐 Intranets que este usuário pode acessar</h4>' +
     '<p class="doc-size" style="margin-bottom:8px">Marque as intranets liberadas. O papel Administrador e o campo "Acesso administrativo" acessam todas automaticamente.</p>' +
     '<div class="perm-user-grid">' +
-      Object.keys(INTRANET_META).map(k =>
-        permUserChk('pi-' + k, INTRANET_META[k].ic + ' ' + INTRANET_META[k].n, (x.intranets || []).includes(k))
+            intraList().map(m =>
+        permUserChk('pi-' + m.key, m.ic + ' ' + m.n, (x.intranets || []).includes(m.key))
       ).join('') +
     '</div>' +
     '</div>' +
@@ -2373,7 +2592,7 @@ function saveUser(email){
     cargo, setor, role:v('u-role'), unidade:v('u-unid'),
     matricula:v('u-mat'), ramal:v('u-ram'),
     ingresso:(users.find(z => z.email === email) || {}).ingresso || new Date().toISOString().slice(0,10),
-        perms: {
+    perms: {
       documentos: !!document.getElementById('pu-documentos').checked,
       comunicacao: !!document.getElementById('pu-comunicacao').checked,
       comunicacaoPropria: !!document.getElementById('pu-comunicacao-propria').checked,
@@ -2383,7 +2602,7 @@ function saveUser(email){
       ocorrencias: !!document.getElementById('pu-ocorrencias').checked,
       admin: !!document.getElementById('pu-admin').checked
     },
-    intranets: Object.keys(INTRANET_META).filter(k => {
+       intranets: intraList().map(m => m.key).filter(k => {
       const el = document.getElementById('pi-' + k);
       return !!(el && el.checked);
     })
@@ -2502,7 +2721,9 @@ function admBody(){
   else if(ADM_ABA === 'reqs') admReqs(el);
   else if(ADM_ABA === 'perms') admPerms(el);
   else if(ADM_ABA === 'docs') admDocs(el);
+  else if(ADM_ABA === 'intranets') admIntranets(el);
 }
+
 /* ---------- Todos os Usuários (CRUD completo) ---------- */
 function admUsuarios(el){
   const users = get(K.U, []);
@@ -3117,64 +3338,216 @@ function depNorm(s){
 function userAcessaIntranet(key){
   const u = me();
   if(!u) return false;
+  if(intraMeta(key).ativo === false) return false;
   if(u.role === 'admin' || (u.perms || {}).admin) return true;
   if((u.intranets || []).includes(key)) return true;
-  return INTRANET_DEPTS[key].includes(depNorm(u.setor));
+  return intraDepts(key).indexOf(depNorm(u.setor)) !== -1;
 }
 function pIntranetHub(){
+  const metas = intraList().filter(function(m){ return m.ativo !== false; });
+  if(!metas.length) return '<h2 class="sec"><span class="train-accent-des"></span>  Intranets por Setor</h2>' +
+    '<div class="card"><p class="meta">Nenhuma intranet ativa no momento.</p></div>';
   return '<h2 class="sec"><span class="train-accent-des"></span>  Intranets por Setor</h2>' +
     '<div class="ferr-grid">' +
-    Object.keys(INTRANET_META).map(k => {
-      const m = INTRANET_META[k];
-      const ok = userAcessaIntranet(k);
-      return '<div class="ferr-card' + (ok ? '' : ' locked') + '"><h4>' + m.ic + ' ' + m.n + '</h4>' +
-        '<p>' + m.desc + '</p>' +
-        '<button class="btn-navy-block" onclick="page=\'intra-' + k + '\';renderPage()">' +
+    metas.map(function(m){
+      const ok = userAcessaIntranet(m.key);
+      const rota = m.rota || 'intra-' + m.key;
+      return '<div class="ferr-card' + (ok ? '' : ' locked') + '"><h4>' + m.ic + ' ' + esc(m.n) + '</h4>' +
+        '<p>' + esc(m.desc) + '</p>' +
+        '<button class="btn-navy-block" onclick="page=\'' + esc(rota) + '\';renderPage()">' +
         (ok ? 'Acessar' : '🔒 Sem acesso') + '</button></div>';
     }).join('') + '</div>';
 }
 function pIntranetSetor(key){
-  const meta = INTRANET_META[key] || { n:'Intranet', ic:'🏢', desc:'' };
+  const meta = intraMeta(key);
   if(!userAcessaIntranet(key)){
     return '<h2 class="sec"><span class="train-accent-des"></span> ' + meta.ic + ' ' + meta.n + '</h2>' +
       '<div class="card"><p class="meta">🔒 Esta intranet não está liberada para o seu acesso. Fale com o administrador para solicitar a liberação.</p></div>';
   }
+  const depts = intraDepts(key);
   const links = INTRANET_LINKS[key] || [];
   let h = '<h2 class="sec"><span class="train-accent-des"></span> ' + meta.ic + ' ' + meta.n + '</h2>' +
-    '<div class="sub-text" style="margin-bottom:14px">' + meta.desc + '</div>' +
-    '<div class="ferr-grid">' +
-    links.map(l => {
-      const acao = l.rota
-        ? "page='" + l.u + "';renderPage()"
-        : (l.u ? "window.open('" + l.u + "','_blank')" : "toast('Link ainda não configurado.','warn')");
-      return '<div class="ferr-card"><h4>' + l.ic + ' ' + esc(l.n) + '</h4><p>' + esc(l.d) + '</p>' +
-        '<button class="btn-navy-block" onclick="' + acao + '">Abrir</button></div>';
-    }).join('') + '</div>';
-  const docs = get(K.D, []).filter(d =>
-    INTRANET_DEPTS[key].includes(depNorm(d.departamento)) && docAccess(d, me()) !== 'hidden');
+    '<div class="sub-text" style="margin-bottom:14px">' + meta.desc + '</div>';
+  if(links.length){
+    h += '<div class="ferr-grid">' +
+      links.map(function(l){
+        const acao = l.rota
+          ? "page='" + l.u + "';renderPage()"
+          : (l.u ? "window.open('" + l.u + "','_blank')" : "toast('Link ainda não configurado.','warn')");
+        return '<div class="ferr-card"><h4>' + (l.i || '🔗') + ' ' + esc(l.n) + '</h4><p>' + esc(l.d) + '</p>' +
+          '<button class="btn-navy-block" onclick="' + acao + '">Abrir</button></div>';
+      }).join('') + '</div>';
+  } else {
+    h += '<p class="meta">Nenhum atalho configurado nesta intranet.</p>';
+  }
+  const docs = get(K.D, []).filter(function(d){
+    return depts.indexOf(depNorm(d.departamento)) !== -1 && docAccess(d, me()) !== 'hidden';
+  });
   if(docs.length){
     h += '<h2 class="sec">📚 Documentos do setor</h2><div class="card">' +
-      docs.map(d => {
+      docs.map(function(d){
         const acc = docAccess(d, me());
         return '<div class="doc-item"><span>📄</span>' +
           '<div class="grow"><b>' + esc(d.titulo) + '</b><div class="doc-size">' + esc(d.tamanho) + '</div></div>' +
           (acc === 'open' ? '<button class="btn btn-navy btn-sm" onclick="openDoc(\'' + d.id + '\')">Abrir</button>' : '<span class="lock">🔒</span>');
       }).join('') + '</div></div>';
   }
-  const equipe = get(K.U, []).filter(x => x.ativo !== false && INTRANET_DEPTS[key].includes(depNorm(x.setor)));
+  const equipe = get(K.U, []).filter(function(x){
+    return x.ativo !== false && depts.indexOf(depNorm(x.setor)) !== -1;
+  });
+  const ehAdmin = isAdmin();
   if(equipe.length){
     h += '<h2 class="sec">👥 Equipe do setor</h2><div class="dep-grid">' +
-      equipe.map(x => {
+      equipe.map(function(x){
         const nome = x.nomeCompleto || x.email || 'Colaborador';
-        return '<div class="usr-card"><div class="usr-av">' + initials(nome) + '</div>' +
+        return '<div class="usr-card' + (ehAdmin ? ' usr-clicavel' : '') + '"' +
+          (ehAdmin ? ' onclick="userForm(\'' + esc(x.email) + '\')" title="Clique para editar cadastro"' : '') + '>' +
+          '<div class="usr-av">' + initials(nome) + '</div>' +
           '<div class="usr-info"><b>' + esc(nome) + '</b>' +
           '<span class="usr-role">' + esc(x.cargo || '') + ' • ' + esc(x.setor || '') + '</span>' +
-          '<a class="usr-mail" href="mailto:' + esc(x.email || '') + '">' + esc(x.email || '') + '</a></div></div>';
+          '<a class="usr-mail" href="mailto:' + esc(x.email || '') + '" onclick="event.stopPropagation()">' + esc(x.email || '') + '</a>' +
+          (ehAdmin ? '<span class="usr-edit">✏️ Clique para editar</span>' : '') +
+          '</div></div>';
       }).join('') + '</div>';
   }
   return h;
 }
-
+/* ===== APOIO: PERMISSÕES + CRUD DE INTRANETS ===== */
+function permUserChk(id, label, checked, extra){
+  return '<label><input type="checkbox" id="' + id + '"' + (checked ? ' checked' : '') + (extra || '') + '> ' + label + '</label>';
+}
+function intraSeed(){
+  return Object.keys(INTRANET_META).map(function(k){
+    return {
+      key: k,
+      n: INTRANET_META[k].n,
+      ic: INTRANET_META[k].ic || '🌐',
+      desc: INTRANET_META[k].desc || '',
+      depts: (INTRANET_DEPTS[k] || []).slice(),
+      rota: 'intra-' + k,
+      ativo: true
+    };
+  });
+}
+function intraList(){
+  var s = get('italac_intranets', null);
+  if(s && s.itens) return s.itens;
+  return intraSeed();
+}
+function intraCommit(itens){ set('italac_intranets', { itens: itens }); }
+function intraMeta(key){
+  var it = intraList().find(function(x){ return x.key === key; });
+  return it || { key: key, n: key, ic: '🌐', desc: '', depts: [], rota: 'intra-' + key, ativo: true };
+}
+function intraDepts(key){ return (intraMeta(key).depts || []).slice(); }
+function intraColabs(key){
+  var depts = intraDepts(key);
+  return get(K.U, []).filter(function(u){
+    if(!u || u.ativo === false) return false;
+    if(u.role === 'admin' || (u.perms || {}).admin) return true;
+    if((u.intranets || []).indexOf(key) !== -1) return true;
+    return depts.some(function(d){ return depNorm(d) === depNorm(u.setor); });
+  });
+}
+function admIntranets(el){
+  const lista = intraList();
+  el.innerHTML = '<div class="card">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">' +
+      '<h3 class="navy-text" style="font-size:1rem;margin:0">🛠️ Intranets <span class="doc-size">(' + lista.length + ')</span></h3>' +
+      '<button class="btn btn-primary btn-sm" onclick="intraForm()">+ Nova intranet</button>' +
+    '</div>' +
+    '<p class="doc-size" style="margin-bottom:10px">Edite nome, descrição e link, ative/desative e exclua intranets.</p>' +
+    (lista.length ? '<table class="adm-tbl"><thead><tr><th>Intranet</th><th>Status</th><th>Pessoas com acesso</th><th>Link da página</th><th style="width:170px">Ações</th></tr></thead><tbody>' +
+      lista.map(function(m){
+        const nColab = intraColabs(m.key).length;
+        const ativa = m.ativo !== false;
+        return '<tr style="' + (ativa ? '' : 'opacity:.55') + '">' +
+          '<td><b>' + m.ic + ' ' + esc(m.n) + '</b></td>' +
+          '<td><span style="font-size:.72rem;padding:2px 8px;border-radius:20px;background:' + (ativa ? '#e8f5e9' : '#fdecea') + ';color:' + (ativa ? '#2e7d32' : '#c0392b') + '">' + (ativa ? '● Ativa' : '● Inativa') + '</span></td>' +
+          '<td>' + nColab + ' colaborador(es)</td>' +
+          '<td class="doc-size">' + esc(m.rota || 'intra-' + m.key) + '</td>' +
+          '<td>' +
+            '<button class="btn btn-ghost btn-sm" onclick="intraForm(\'' + esc(m.key) + '\')" title="Editar">✏️</button> ' +
+            '<button class="btn btn-ghost btn-sm" onclick="toggleIntra(\'' + esc(m.key) + '\')" title="' + (ativa ? 'Desativar' : 'Ativar') + '">' + (ativa ? '⛔' : '▶️') + '</button> ' +
+            '<button class="btn btn-ghost btn-sm" style="color:#c0392b" onclick="delIntra(\'' + esc(m.key) + '\')" title="Excluir">🗑️</button>' +
+          '</td>' +
+        '</tr>';
+      }).join('') + '</tbody></table>' :
+      '<p class="meta">Nenhuma intranet cadastrada. Use "+ Nova intranet".</p>') + '</div>';
+}
+function toggleIntra(key){
+  const lista = intraList();
+  const alvo = lista.find(function(x){ return x.key === key; });
+  if(!alvo) return;
+  const novo = alvo.ativo === false;
+  intraCommit(lista.map(function(x){ return x.key === key ? Object.assign({}, x, { ativo: novo }) : x; }));
+  toast('Intranet ' + (novo ? 'ativada.' : 'desativada.'), 'ok');
+  renderPage(); buildNav();
+}
+function intraForm(key){
+  const m = key ? intraMeta(key) : null;
+  const chave = m ? m.key : '';
+  const colabs = intraColabs(chave);
+  const ativa = m ? (m.ativo !== false) : true;
+  const listaColabs = colabs.length
+    ? colabs.map(function(u){
+        const n = u.nomeCompleto || u.email || 'Colaborador';
+        return '<div class="bday">' +
+          '<div class="mini-av">' + initials(n) + '</div>' +
+          '<div><b style="font-size:.84rem">' + esc(n) + '</b>' +
+          '<div style="font-size:.72rem;color:var(--muted)">' + esc(u.cargo || '') + ' • ' + esc(u.setor || '') + '</div></div>' +
+        '</div>';
+      }).join('')
+    : '<p class="meta" style="margin:0">Nenhum colaborador com acesso (apenas o administrador).</p>';
+  openModal('<h3>' + (m ? '✏️ Editar intranet — ' + esc(m.n) : '➕ Nova intranet') + '</h3>' +
+    '<label>Nome da intranet</label>' +
+    '<input id="in-nome" value="' + esc(m ? m.n : '') + '" placeholder="Ex.: Intranet RH">' +
+    '<div class="grid2" style="grid-template-columns:1fr 1fr">' +
+      '<div><label>Status</label><select id="in-ativo">' +
+        '<option value="1"' + (ativa ? ' selected' : '') + '>🟢 Ativa</option>' +
+        '<option value="0"' + (!ativa ? ' selected' : '') + '>🔴 Inativa</option>' +
+      '</select></div>' +
+      '<div><label>Ícone (emoji)</label><input id="in-ic" value="' + esc(m ? m.ic : '🌐') + '"></div>' +
+    '</div>' +
+    '<label>Descrição</label>' +
+    '<textarea id="in-desc" rows="2" placeholder="O que essa intranet reúne?">' + esc(m ? m.desc : '') + '</textarea>' +
+    '<label>👥 Colaboradores com acesso <span class="doc-size">(' + colabs.length + ')</span></label>' +
+    '<div class="card" style="padding:10px;max-height:170px;overflow-y:auto">' + listaColabs + '</div>' +
+    '<label>🔗 Link da página (rota interna)</label>' +
+    '<input id="in-rota" value="' + esc(m ? (m.rota || 'intra-' + m.key) : '') + '" placeholder="intra-rh">' +
+    '<p class="doc-size" style="margin-top:4px">Rota que abre esta intranet. Troque por uma rota única e sem espaços.</p>' +
+    '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">' +
+      '<button class="btn btn-primary" onclick="saveIntra(\'' + esc(chave) + '\')">Salvar</button>' +
+      (m ? '<button class="btn btn-ghost" style="color:#c0392b" onclick="delIntra(\'' + esc(m.key) + '\')">Excluir</button>' : '') +
+    '</div>');
+}
+function saveIntra(key){
+  const nome = (v('in-nome') || '').trim();
+  if(!nome){ toast('Informe o nome da intranet.', 'err'); return; }
+  const desc = (v('in-desc') || '').trim();
+  const ic = (v('in-ic') || '').trim() || '🌐';
+  const rota = (v('in-rota') || '').trim().replace(/\s+/g, '-') || ('intra-' + (key || Date.now()));
+  const ativo = v('in-ativo') === '1';
+  const lista = intraList();
+  const alvo = key ? lista.find(function(x){ return x.key === key; }) : null;
+  if(alvo){
+    intraCommit(lista.map(function(x){ return x.key === key ? Object.assign({}, x, { n: nome, desc: desc, ic: ic, rota: rota, ativo: ativo }) : x; }));
+  } else {
+    const novaKey = 'intra' + Date.now();
+    lista.push({ key: novaKey, n: nome, ic: ic, desc: desc, depts: [], rota: rota, ativo: ativo });
+    intraCommit(lista);
+  }
+  closeModal(); renderPage(); buildNav();
+  toast('Intranet salva.', 'ok');
+}
+function delIntra(key){
+  const alvo = intraList().find(function(x){ return x.key === key; });
+  if(!alvo) return;
+  if(!confirm('Excluir a intranet "' + alvo.n + '" definitivamente?')) return;
+  intraCommit(intraList().filter(function(x){ return x.key !== key; }));
+  toast('Intranet excluída.', 'ok');
+  renderPage();
+}
 /* ================= 24. TOUR DE BOAS-VINDAS ================= */
 const TOUR = [
   ['1/4','Bem-vindo(a) à Intranet Italac!','No menu à esquerda você acessa todas as áreas: comunicações, documentos, RH, vagas e mais. Seu avatar fica no canto superior direito, com "Meu Perfil" e "Sair".'],
