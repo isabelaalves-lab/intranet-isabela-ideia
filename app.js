@@ -141,7 +141,7 @@ function boot(){
   if(!get(K.P)) set(K.P, {});
 }
 boot();
-
+set(K.C, get(K.C, []).map(c => c.status ? c : Object.assign({}, c, { status:'publicado' })));
 /* ================= 3. SESSÃO E PERMISSÕES ================= */
 const me = () => {
   const s = get(K.S);
@@ -434,18 +434,15 @@ function startClock(){
 
 function pendingFor(u){
   let n = 0;
-  /* Solicitações de acesso pendentes (admin) */
-  if(isAdm(u)) n += get(K.R, []).filter(r => r.status === 'PENDENTE').length;
-  /* Vagas aguardando RH (gerente de RH ou admin) */
-  if(u.setor === 'RH' && u.role === 'gerente' || isAdm(u))
+  /* Vagas aguardando aprovação do RH (só gerente de RH) */
+  if(u.setor === 'RH' && u.role === 'gerente')
     n += get(K.J, []).filter(j => j.status === 'PENDENTE_RH').length;
-  /* Ocorrências pendentes no setor do gerente */
+  /* Ocorrências pendentes no setor do gerente (nunca admin) */
   if(u.role === 'gerente' && u.setor !== 'RH')
     n += get(K.O, []).filter(o => o.status === 'PENDENTE' && o.setorSolicitante === u.setor).length;
-  /* Ocorrências aprovadas pelo gerente aguardando RH */
-  if((u.setor === 'RH' && u.role === 'gerente') || isAdm(u))
+  /* Ocorrências aprovadas pelo gerente aguardando o RH (só gerente de RH) */
+  if(u.setor === 'RH' && u.role === 'gerente')
     n += get(K.O, []).filter(o => o.status === 'APROVADA_GERENTE').length;
-  if(canComm(u)) n += get(K.C, []).filter(c => c.status === 'rascunho').length;
   return n;
 }
 
@@ -646,7 +643,7 @@ function tenure(u){
 function pInicio(){
   const u = me();
   const can = isAdm(u) || (u.setor === 'Marketing' && RANK[u.role] >= 1);
-const todas = get(K.C, []).filter(c => c.tab === 'empresa' && c.status !== 'rascunho');
+const todas = get(K.C, []).filter(c => c.tab === 'empresa' && c.status === 'publicado');
   const principal = todas.find(c => c.dest) || null;
   const demais = todas.filter(c => c.id !== (principal ? principal.id : null));
   const visiveis = demais.slice(0, 3);                     // máximo de 3
@@ -698,10 +695,8 @@ const todas = get(K.C, []).filter(c => c.tab === 'empresa' && c.status !== 'rasc
       ' • Setor ' + esc(u.setor) + '</p>' +
     '<div class="countup">' + tenure(u) + '</div></div>';
 }
-
 /* ================= 12. PÁGINA: COMUNICAÇÃO ================= */
 let commTab = 'tv';
-
 function canComm(u){
   u = u || me();
   if(!u) return false;
@@ -709,15 +704,35 @@ function canComm(u){
   const p = u.perms || {};
   return !!(p.comunicacao || p.comunicacaoPropria || p.comunicacaoTodas);
 }
+function rankOf(u){ return RANK[(u && u.role)] || 1; }
+function podeAprovar(u){
+  u = u || me();
+  return !!(u && (u.role === 'gerente' || u.role === 'admin' || (u.perms || {}).admin));
+}
+/* Auxiliar e analista precisam de aprovação de cargo maior; gerente/admin não */
+function precisaAprovacao(u){
+  u = u || me();
+  if(!u) return false;
+  return rankOf(u) < RANK.gerente;
+}
+function autorPrecisaAprovacao(c){
+  const autor = get(K.U, []).find(x => x.email === c.autor);
+  return precisaAprovacao(autor);
+}
+
 function pComunicacao(){
   const u = me(), can = canComm();
   const tabs = [['tv','TV Corporativa'],['mercado','Mercado Lácteo'],['empresa','Notícias da Empresa']];
   if(can) tabs.push(['rascunho','📝 Rascunhos']);
-  const list = get(K.C, []).filter(c =>
-    commTab === 'rascunho'
-      ? (can && c.status === 'rascunho')
-      : (c.status !== 'rascunho' && c.tab === commTab)
-  ).sort((a, b) => (a.dest === b.dest) ? 0 : (a.dest ? -1 : 1));
+  if(podeAprovar(u)) tabs.push(['aprovacao','✅ Aprovações']);
+
+  const list = get(K.C, []).filter(c => {
+    if(commTab === 'rascunho')
+      return can && c.status === 'rascunho' && c.autor === u.email;
+    if(commTab === 'aprovacao')
+      return podeAprovar() && c.status === 'pendente';
+    return c.status === 'publicado' && c.tab === commTab;
+  }).sort((a, b) => (a.dest === b.dest) ? 0 : (a.dest ? -1 : 1));
 
   /* Paginação em blocos de 6 */
   const qtd = commQtd[commTab] || 6;
@@ -725,8 +740,7 @@ function pComunicacao(){
   const temMais = list.length > qtd;
 
   return '<h2 class="sec"><span class="train-accent-des"></span> Comunicação Corporativa' +
-    (can ? ' <button class="btn btn-primary btn-sm" onclick="commForm()">+ Nova Comunicação</button>' +
-      ' <button class="btn btn-ghost btn-sm" onclick="importarRascunhos()">📝 Importar rascunhos</button>' : '') + '</h2>' +
+    (can ? ' <button class="btn btn-primary btn-sm" onclick="commForm()">+ Nova Comunicação</button>' : '') + '</h2>' +
     '<div class="tabs">' + tabs.map(t =>
       '<button class="tab' + (commTab === t[0] ? ' active' : '') +
       '" onclick="commTab=\'' + t[0] + '\';commQtd[\'' + t[0] + '\']=6;renderPage()">' + t[1] + '</button>').join('') + '</div>' +
@@ -741,22 +755,39 @@ function pComunicacao(){
       (c.img ? '<img src="' + esc(c.img) + '" alt="' + esc(c.titulo) + '">' : '') +
       '<div class="feat-body">' +
       (c.status === 'rascunho' ? '<span class="badge bg-sk">📝 Rascunho</span> ' : '') +
+      (c.status === 'pendente' ? '<span class="badge bg-or">⏳ Aguardando aprovação</span> ' : '') +
       (c.dest ? '<span class="badge bg-or">★ Destaque da Home</span> ' : '') +
       '<span class="badge bg-or">' + esc(c.tipo) + '</span> ' +
       '<span class="meta">' + esc(c.data) + (c.dur ? ' • ' + c.dur : '') + '</span>' +
       '<h4>' + esc(c.titulo) + '</h4><p>' + esc(c.conteudo) + '</p>' +
       (c.fonte ? '<div class="doc-size" style="margin-bottom:6px">Fonte: ' + esc(c.fonte) + '</div>' : '') +
-      (c.status === 'rascunho'
+            (c.status === 'rascunho'
         ? '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
-          '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();publicarComm(\'' + c.id + '\')">✅ Publicar</button>' +
-          '<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();commForm(\'' + c.id + '\')">✏️ Editar</button>' +
-          '<button class="btn btn-ghost btn-sm" style="color:#c0392b" onclick="event.stopPropagation();delComm(\'' + c.id + '\')">🗑 Excluir</button>' +
+          (c.aprovacao && c.aprovacao.status === 'recusado'
+            ? '<div style="background:#fdecea;border:1px solid #f5c6c6;border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:.8rem;width:100%">' +
+              '<b style="color:#c0392b">❌ Recusada por ' + esc(c.aprovacao.recusadoPor || '') + '</b>' +
+              (c.aprovacao.recusadoEm ? ' <span class="doc-size">em ' + esc(c.aprovacao.recusadoEm) + '</span>' : '') +
+              '<div style="margin-top:4px">' + esc(c.aprovacao.observacao || '') + '</div>' +
+              '</div>' : '') +
+          (c.aprovacao && c.aprovacao.status === 'pendente'
+            ? '<span class="badge bg-or">⏳ Em análise</span>' +
+              '<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();cancelarAprovacao(\'' + c.id + '\')">↩️ Cancelar envio</button>'
+            : (autorPrecisaAprovacao(c)
+                ? '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();enviarAprovacao(\'' + c.id + '\')">📤 Enviar para aprovação</button>'
+                : '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();publicarComm(\'' + c.id + '\')">✅ Publicar</button>') +
+              '<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();commForm(\'' + c.id + '\')">✏️ Editar</button>' +
+              '<button class="btn btn-ghost btn-sm" style="color:#c0392b" onclick="event.stopPropagation();delComm(\'' + c.id + '\')">🗑 Excluir</button>') +
           '</div>'
-        : (podeEditarComunicacao(c) ?
-          (commTab === 'empresa' ?
-            '<button class="btn btn-ghost btn-sm" style="margin-top:8px;color:#e67e22" onclick="event.stopPropagation();destaqueComm(\'' + c.id + '\')">' + (c.dest ? '★ Remover destaque' : '★ Destacar no Inicio') + '</button>' : '') +
-          '<button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="event.stopPropagation();commForm(\'' + c.id + '\')">✏️ Editar</button>' +
-          '<button class="btn btn-ghost btn-sm" style="margin-top:8px;color:#c0392b" onclick="event.stopPropagation();delComm(\'' + c.id + '\')">🗑 Excluir</button>' : '')) +
+        : c.status === 'pendente'
+          ? '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+            '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();aprovarComm(\'' + c.id + '\')">✅ Aprovar e publicar</button>' +
+            '<button class="btn btn-ghost btn-sm" style="color:#c0392b" onclick="event.stopPropagation();recusarComm(\'' + c.id + '\')">❌ Recusar</button>' +
+            '</div>'
+          : (podeEditarComunicacao(c) ?
+            (commTab === 'empresa' ?
+              '<button class="btn btn-ghost btn-sm" style="margin-top:8px;color:#e67e22" onclick="event.stopPropagation();destaqueComm(\'' + c.id + '\')">' + (c.dest ? '★ Remover destaque' : '★ Destacar no Inicio') + '</button>' : '') +
+            '<button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="event.stopPropagation();commForm(\'' + c.id + '\')">✏️ Editar</button>' +
+            '<button class="btn btn-ghost btn-sm" style="margin-top:8px;color:#c0392b" onclick="event.stopPropagation();delComm(\'' + c.id + '\')">🗑 Excluir</button>' : '')) +
       '</div></div>').join('') ||
     '<p class="meta">Nenhuma publicação nesta aba.</p>') +
     '</div>' +
@@ -768,6 +799,7 @@ function pComunicacao(){
 function commForm(id){
   const c = get(K.C, []).find(x => x.id === id) || {};
   openModal('<h3>' + (id ? 'Editar' : 'Nova') + ' Comunicação</h3>' +
+    '<p class="doc-size" style="margin:2px 0 8px">' + (id ? 'Edite os dados abaixo.' : 'Ao salvar, a comunicação vai para a aba 📝 Rascunhos. Se precisar de aprovação, você envia para um cargo maior.') + '</p>' +
     '<label>Título *</label><input id="c-t" required value="' + esc(c.titulo || '') + '">' +
     '<label>Tipo *</label><select id="c-tp" required>' +
       ['Redes Sociais','Indústria & Produção','Pesquisa & Inovação','Comunicação Interna','TV Corporativa','Mercado Lácteo']
@@ -787,7 +819,7 @@ function commForm(id){
         'style="display:' + (c.img ? 'inline-block' : 'none') + '" onclick="clearImg()">✖ Remover</button>' +
     '</div>' +
     '<label>Conteúdo *</label><textarea id="c-x" rows="4" required>' + esc(c.conteudo || '') + '</textarea>' +
-    '<button class="btn btn-primary" style="margin-top:14px" onclick="saveComm(\'' + (id || '') + '\')">Publicar</button>');
+    '<button class="btn btn-primary" style="margin-top:14px" onclick="saveComm(\'' + (id || '') + '\')">' + (id ? 'Salvar alterações' : 'Salvar rascunho') + '</button>');
 }
 function sv(id){ const el = document.getElementById(id); return el ? el.value : ''; }
 
@@ -802,18 +834,106 @@ function saveComm(id){
   if(!img){ toast('Escolha uma imagem.', 'err'); return; }
   if(!conteudo.trim()){ toast('Preencha o conteúdo.', 'err'); return; }
   const antiga = id ? (list.find(x => x.id === id) || {}) : {};
+  const precisa = precisaAprovacao(u);
   const o = {
     id: id || uid(), titulo:titulo, tipo:tipo, tab:tab,
     img:img, conteudo:conteudo,
     data: antiga.data || new Date().toLocaleDateString('pt-BR').slice(0,5),
     autor: antiga.autor || u.email,
     dest: antiga.dest,
-    status: antiga.status || 'publicado',
+    status: antiga.status || 'rascunho',
+    aprovacao: antiga.aprovacao || (precisa ? { status:'nao_enviado' } : { status:'dispensada' }),
     fonte: antiga.fonte || ''
   };
   if(id){ set(K.C, list.map(x => x.id === id ? o : x)); toast('Comunicação atualizada.', 'ok'); }
-  else  { list.unshift(o); set(K.C, list); toast('Comunicação publicada!', 'ok'); }
+  else  { list.unshift(o); set(K.C, list); toast('Rascunho salvo na aba 📝 Rascunhos.', 'ok'); }
   closeModal(); renderPage();
+}
+
+/* ===== FLUXO DE APROVAÇÃO ===== */
+function enviarAprovacao(id){
+  const u = me();
+  const list = get(K.C, []);
+  const alvo = list.find(c => c.id === id);
+  if(!alvo) return;
+  if(alvo.autor !== u.email){ toast('Somente o autor pode enviar.', 'err'); return; }
+  set(K.C, list.map(c => c.id === id
+    ? Object.assign({}, c, { status:'pendente', aprovacao: Object.assign({}, c.aprovacao, { status:'pendente', enviadoEm: new Date().toLocaleDateString('pt-BR') }) })
+    : c));
+  toast('Enviado para aprovação.', 'ok');
+  renderPage();
+}
+function cancelarAprovacao(id){
+  const u = me();
+  const list = get(K.C, []);
+  const alvo = list.find(c => c.id === id);
+  if(!alvo) return;
+  if(alvo.autor !== u.email){ toast('Somente o autor pode cancelar.', 'err'); return; }
+  set(K.C, list.map(c => c.id === id
+    ? Object.assign({}, c, { status:'rascunho', aprovacao: Object.assign({}, c.aprovacao, { status:'nao_enviado' }) })
+    : c));
+  toast('Envio cancelado.', 'ok');
+  renderPage();
+}
+function aprovarComm(id){
+  const u = me();
+  if(!podeAprovar(u)){ toast('Sem permissão para aprovar.', 'err'); return; }
+  const list = get(K.C, []);
+  const alvo = list.find(c => c.id === id);
+  if(!alvo) return;
+  set(K.C, list.map(c => c.id === id
+    ? Object.assign({}, c, { status:'publicado', aprovacao: Object.assign({}, c.aprovacao, { status:'aprovado', aprovadoPor: u.email, aprovadoEm: new Date().toLocaleDateString('pt-BR') }) })
+    : c));
+  toast('Comunicação aprovada e publicada.', 'ok');
+  renderPage();
+}
+function recusarComm(id){
+  const u = me();
+  if(!podeAprovar(u)){ toast('Sem permissão para recusar.', 'err'); return; }
+  const list = get(K.C, []);
+  const alvo = list.find(c => c.id === id);
+  if(!alvo) return;
+  openModal('<h3>❌ Recusar comunicação</h3>' +
+    '<p class="doc-size" style="margin:2px 0 8px">Informe o motivo da recusa. O autor verá esta observação ao reabrir o rascunho.</p>' +
+    '<label>Observação (obrigatória)</label>' +
+    '<textarea id="rec-obs" rows="4" placeholder="Ex.: Ajustar o título para refletir a fonte oficial antes de republicar."></textarea>' +
+    '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">' +
+      '<button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>' +
+      '<button class="btn btn-primary" style="background:#c0392b;border-color:#c0392b" onclick="recusarCommFinal(\'' + id + '\')">❌ Confirmar recusa</button>' +
+    '</div>');
+}
+function recusarCommFinal(id){
+  const u = me();
+  if(!podeAprovar(u)){ toast('Sem permissão para recusar.', 'err'); return; }
+  const obs = (document.getElementById('rec-obs') || {}).value || '';
+  if(!obs.trim()){ toast('Informe a observação da recusa.', 'err'); return; }
+  const list = get(K.C, []);
+  const alvo = list.find(c => c.id === id);
+  if(!alvo) return;
+  set(K.C, list.map(c => c.id === id
+    ? Object.assign({}, c, {
+        status: 'rascunho',
+        aprovacao: Object.assign({}, c.aprovacao, {
+          status: 'recusado',
+          recusadoPor: u.email,
+          observacao: obs.trim(),
+          recusadoEm: new Date().toLocaleDateString('pt-BR')
+        })
+      })
+    : c));
+  toast('Comunicação recusada, voltou para rascunho.', 'ok');
+  renderPage();
+}
+function publicarComm(id){
+  const u = me(), list = get(K.C, []);
+  const alvo = list.find(c => c.id === id);
+  if(!alvo) return;
+  if(!(alvo.autor === u.email || podeAprovar(u))){ toast('Sem permissão para publicar.', 'err'); return; }
+  if(autorPrecisaAprovacao(alvo) && !podeAprovar(u)){ toast('Esta comunicação precisa de aprovação.', 'err'); return; }
+  if(!alvo.img){ toast('Adicione uma imagem antes de publicar.', 'err'); commForm(id); return; }
+  set(K.C, list.map(c => c.id === id
+    ? Object.assign({}, c, { status:'publicado', aprovacao:Object.assign({}, c.aprovacao, { status:'dispensada' }) }) : c));
+  toast('Notícia publicada no canal oficial.', 'ok'); renderPage();
 }
 function delComm(id){
   const u = me(), c = get(K.C, []).find(x => x.id === id);
@@ -861,8 +981,8 @@ function openComm(id){
   const c = get(K.C, []).find(x => x.id === id); if(!c) return;
   openModal('<h3>' + esc(c.titulo) + '</h3><span class="badge bg-sk">' + esc(c.tipo) + '</span>' +
     (c.img ? '<img src="' + esc(c.img) + '" alt="' + esc(c.titulo) + '" style="width:100%;max-height:280px;object-fit:cover;border-radius:10px;margin-top:12px">' : '') +
-    '<p style="margin-top:12px;font-size:.9rem">' + esc(c.conteudo) + '</p>');
-    (c.fonte ? '<p class="doc-size" style="margin-top:10px">Fonte: ' + esc(c.fonte) + '</p>' : '');
+    '<p style="margin-top:12px;font-size:.9rem">' + esc(c.conteudo) + '</p>' +
+    (c.fonte ? '<p class="doc-size" style="margin-top:10px">Fonte: ' + esc(c.fonte) + '</p>' : ''));
 }
 /* ================= RASCUNHOS DE NOTÍCIAS ================= */
 /* Abre o modal para colar o bloco JSON que a automação semanal entrega */
@@ -924,21 +1044,7 @@ function importarLista(lista){
   set(K.C, list);
   return novos;
 }
-/* Publica um rascunho depois da revisão */
-function publicarComm(id){
-  const list = get(K.C, []);
-  const alvo = list.find(c => c.id === id);
-  if(!alvo) return;
-  if(!podeEditarComunicacao(alvo)){ toast('Sem permissão para publicar.', 'err'); return; }
-  if(!alvo.img){
-    toast('Adicione uma imagem antes de publicar.', 'err');
-    commForm(id);
-    return;
-  }
-  set(K.C, list.map(c => c.id === id ? Object.assign({}, c, {status:'publicado'}) : c));
-  toast('Notícia publicada no canal oficial.', 'ok');
-  renderPage();
-}
+
 
 /* Paginação da Comunicação: blocos de 6 por aba */
 let commQtd = { tv: 6, mercado: 6, empresa: 6, rascunho: 6 };
@@ -2508,7 +2614,6 @@ function pHist(){
 }
 /* ================= 23. PÁGINA: ADMINISTRAÇÃO (só admin) ================= */
 let adminTab = 'usuarios';
-const PERM_KEYS = [['docs','Gerenciar documentos'],['comms','Publicar comunicações'],['train','Criar treinamentos'],['vagas','Solicitar vagas'],['occ','Aprovar ocorrências'],['admin','Acesso administrativo']];
 
 function pAdmin(){
   const u = me();
@@ -2519,7 +2624,6 @@ function pAdmin(){
   const ABAS = ADM_ABAS.concat([
     ['usuarios','👥 Todos os Usuários'],
     ['reqs','📥 Solicitações de acesso'],
-    ['perms','🔐 Permissões por setor e cargo'],
     ['docs','📚 Normas & Documentos'],
     ['intranets','🛠️ Intranets'],
   ]);
@@ -2549,8 +2653,6 @@ function userForm(email){
         .map(s => '<option ' + (x.setor === s ? 'selected' : '') + '>' + s + '</option>').join('') + '</select></div>' +
     '</div>' +
     '<div class="grid2" style="grid-template-columns:1fr 1fr">' +
-      '<div><label>Papel (perfil de acesso)</label><select id="u-role">' +
-        ['auxiliar','analista','gerente','admin'].map(r => '<option ' + (x.role === r ? 'selected' : '') + '>' + r + '</option>').join('') + '</select></div>' +
       '<div><label>Unidade</label><select id="u-unid">' +
         ['Goiânia','Anápolis','Belo Horizonte','Campinas'].map(s => '<option ' + (x.unidade === s ? 'selected' : '') + '>' + s + '</option>').join('') + '</select></div>' +
     '</div>' +
@@ -2621,6 +2723,7 @@ function saveUser(email){
 function permUserChk(id, label, checked){
   return '<label><input type="checkbox" id="' + id + '"' + (checked ? ' checked' : '') + '> ' + label + '</label>';
 }
+
 function escopoCalOptions(sel){
   var setores = ['todos'].concat(Array.from(new Set(get(K.U, []).map(x => (x.setor || '').trim()).filter(Boolean))).sort());
   return setores.map(s =>
@@ -2628,7 +2731,7 @@ function escopoCalOptions(sel){
     (s === 'todos' ? 'Todos os setores' : 'Somente ' + esc(s)) + '</option>').join('');
 }
 function permUserSave(u){
-  function chk(id){ var el = document.getElementById(id); return !!(el && el.checked); }
+  function chk(id){ permUserChk('pu-calendario','Criar eventos no calendário', p.calendario); var el = document.getElementById(id); return !!(el && el.checked); }
   u.perms = {
     documentos: chk('pu-documentos'),
     comunicacao: chk('pu-comunicacao'),
@@ -2642,40 +2745,7 @@ function permUserSave(u){
   u.calSetor = (document.getElementById('pu-calsetor') || {}).value || u.setor || 'todos';
   return u;
 }
-function permForm(setor, cargo){
-  const perms = get(K.P, {});
-  const cur = perms[setor + '|' + cargo] || {};
-  openModal('<h3>🔐 Permissões — ' + (setor ? esc(setor) + ' • ' + esc(cargo) : 'Nova combinação') + '</h3>' +
-    '<div class="grid2" style="grid-template-columns:1fr 1fr">' +
-      '<div><label>Setor</label><select id="p-s">' +
-        ['Administrativo','TI','RH','Financeiro','Marketing','Produção','Qualidade & BPF','Jurídico & Compliance','Logística & Frota','Diretoria']
-        .map(s => '<option ' + (setor === s ? 'selected' : '') + '>' + s + '</option>').join('') + '</select></div>' +
-      '<div><label>Cargo</label><select id="p-c">' +
-        ['Assistente','Auxiliar Administrativo','Jovem Aprendiz','Analista','Coordenador','Gerente','Diretor','Administrador']
-        .map(c => '<option ' + (cargo === c ? 'selected' : '') + '>' + c + '</option>').join('') + '</select></div>' +
-    '</div>' +
-    '<div style="margin-top:10px">' + PERM_KEYS.map(pk =>
-      '<label style="display:block;margin:8px 0;font-size:.85rem;text-transform:none">' +
-      '<input type="checkbox" id="pm-' + pk[0] + '" style="width:auto" ' + (cur[pk[0]] ? 'checked' : '') + '> ' + pk[1] + '</label>').join('') + '</div>' +
-    '<button class="btn btn-primary" style="margin-top:14px" onclick="savePerm(\'' + esc(setor) + '\',\'' + esc(cargo) + '\')">Salvar</button>');
-}
 
-function savePerm(oldSetor, oldCargo){
-  const perms = get(K.P, {});
-  delete perms[oldSetor + '|' + oldCargo];
-  const chosen = {};
-  let any = false;
-  PERM_KEYS.forEach(pk => { if(document.getElementById('pm-' + pk[0]).checked){ chosen[pk[0]] = true; any = true; } });
-  if(any) perms[v('p-s') + '|' + v('p-c')] = chosen;
-  set(K.P, perms);
-  closeModal(); renderPage(); toast('Permissões atualizadas.', 'ok');
-}
-function delPerm(setor, cargo){
-  const perms = get(K.P, {});
-  delete perms[setor + '|' + cargo];
-  set(K.P, perms);
-  renderPage(); toast('Configuração removida — voltou ao padrão do cargo.', 'warn');
-}
 /* ================= ADMIN: PAINEL DE GERENCIAMENTO ================= */
 function admSeedProgramas(){
   if(get('italac_programas_seedado', false)) return;
@@ -2719,7 +2789,6 @@ function admBody(){
   else if(ADM_ABA === 'user') admUser(el);
   else if(ADM_ABA === 'usuarios') admUsuarios(el);
   else if(ADM_ABA === 'reqs') admReqs(el);
-  else if(ADM_ABA === 'perms') admPerms(el);
   else if(ADM_ABA === 'docs') admDocs(el);
   else if(ADM_ABA === 'intranets') admIntranets(el);
 }
@@ -2779,12 +2848,15 @@ function podeEditarComunicacao(c){
    Cada usuário guarda u.perms = { documentos, comunicacao, treinamentos,
    vagas, ocorrencias, aprovarVagas, calendario, admin } e u.calSetor.
    Papel admin e u.perms.admin passam em tudo. O resto só com checkbox marcado. */
+const PERM_PADRAO = {
+  gerente:  { documentos:true, treinamentos:true, vagas:true, ocorrencias:true, calendario:true },
+  analista: { documentos:true }
+};
+
 function temPerm(u, c){
   if(!u) return false;
-  if(u.role === 'admin') return true;
-  var p = u.perms || {};
-  if(p.admin) return true;
-  return p[c] === true;
+  if(u.role === 'admin' || (u.perms || {}).admin) return true;
+  return (u.perms || {})[c] === true || !!(PERM_PADRAO[u.role] || {})[c];
 }
 function cap(c){
   return temPerm(me(), c);
@@ -2825,22 +2897,6 @@ function admReqs(el){
         '<button class="btn btn-danger btn-sm" onclick="denyReq(\'' + r.id + '\')">Negar</button>' : '—') + '</td></tr>').join('') ||
       '<tr><td colspan="5" class="doc-size">Nenhuma solicitação registrada.</td></tr>') +
     '</tbody></table>';
-}
-/* ---------- Permissões por setor e cargo ---------- */
-function admPerms(el){
-  const perms = get(K.P, {});
-  const chaves = Object.keys(perms);
-  el.innerHTML = '<p class="sub-text" style="margin-bottom:10px">Configure o que cada combinação de <b>setor + cargo</b> pode fazer. Combinações sem configuração usam o padrão do papel.</p>' +
-    '<div class="tools-row"><button class="btn btn-primary btn-sm" onclick="permForm()">+ Nova combinação setor + cargo</button></div>' +
-    (chaves.length ?
-      '<table class="adm-tbl"><thead><tr><th>Setor</th><th>Cargo</th><th>Permissões</th><th>Ações</th></tr></thead><tbody>' +
-      chaves.map(k => { const s = k.split('|')[0], c = k.split('|')[1];
-        return '<tr><td>' + esc(s) + '</td><td>' + esc(c) + '</td><td>' +
-          PERM_KEYS.filter(pk => perms[k][pk[0]]).map(pk => '<span class="perm-chip">' + pk[1] + '</span>').join(' ') + '</td>' +
-          '<td><button class="btn btn-ghost btn-sm" onclick="permForm(\'' + esc(s) + '\',\'' + esc(c) + '\')">✏️ Editar</button> ' +
-          '<button class="btn btn-danger btn-sm" onclick="delPerm(\'' + esc(s) + '\',\'' + esc(c) + '\')">🗑️</button></td></tr>'; }).join('') +
-      '</tbody></table>'
-      : '<p class="meta">Nenhuma configuração personalizada — todas as combinações usam os padrões por cargo.</p>');
 }
 /* ---------- Normas & Documentos (visão) ---------- */
 function admDocs(el){
@@ -3352,7 +3408,7 @@ function pIntranetHub(){
     metas.map(function(m){
       const ok = userAcessaIntranet(m.key);
       const rota = m.rota || 'intra-' + m.key;
-      return '<div class="ferr-card' + (ok ? '' : ' locked') + '"><h4>' + m.ic + ' ' + esc(m.n) + '</h4>' +
+      return '<div class="ferr-card' + (ok ? '' : ' locked') + '"><h4>' + esc(m.n) + '</h4>' +
         '<p>' + esc(m.desc) + '</p>' +
         '<button class="btn-navy-block" onclick="page=\'' + esc(rota) + '\';renderPage()">' +
         (ok ? 'Acessar' : '🔒 Sem acesso') + '</button></div>';
@@ -3361,13 +3417,13 @@ function pIntranetHub(){
 function pIntranetSetor(key){
   const meta = intraMeta(key);
   if(!userAcessaIntranet(key)){
-    return '<h2 class="sec"><span class="train-accent-des"></span> ' + meta.ic + ' ' + meta.n + '</h2>' +
+    return '<h2 class="sec"><span class="train-accent-des"></span> ' + esc(meta.n) + '</h2>' +
       '<div class="card"><p class="meta">🔒 Esta intranet não está liberada para o seu acesso. Fale com o administrador para solicitar a liberação.</p></div>';
   }
   const depts = intraDepts(key);
   const links = INTRANET_LINKS[key] || [];
-  let h = '<h2 class="sec"><span class="train-accent-des"></span> ' + meta.ic + ' ' + meta.n + '</h2>' +
-    '<div class="sub-text" style="margin-bottom:14px">' + meta.desc + '</div>';
+  let h = '<h2 class="sec"><span class="train-accent-des"></span> ' + esc(meta.n) + '</h2>' +
+    '<div class="sub-text" style="margin-bottom:14px">' + esc(meta.desc) + '</div>';
   if(links.length){
     h += '<div class="ferr-grid">' +
       links.map(function(l){
@@ -3421,7 +3477,6 @@ function intraSeed(){
     return {
       key: k,
       n: INTRANET_META[k].n,
-      ic: INTRANET_META[k].ic || '🌐',
       desc: INTRANET_META[k].desc || '',
       depts: (INTRANET_DEPTS[k] || []).slice(),
       rota: 'intra-' + k,
@@ -3437,7 +3492,7 @@ function intraList(){
 function intraCommit(itens){ set('italac_intranets', { itens: itens }); }
 function intraMeta(key){
   var it = intraList().find(function(x){ return x.key === key; });
-  return it || { key: key, n: key, ic: '🌐', desc: '', depts: [], rota: 'intra-' + key, ativo: true };
+  return it || { key: key, n: key, desc: '', depts: [], rota: 'intra-' + key, ativo: true };
 }
 function intraDepts(key){ return (intraMeta(key).depts || []).slice(); }
 function intraColabs(key){
@@ -3462,7 +3517,7 @@ function admIntranets(el){
         const nColab = intraColabs(m.key).length;
         const ativa = m.ativo !== false;
         return '<tr style="' + (ativa ? '' : 'opacity:.55') + '">' +
-          '<td><b>' + m.ic + ' ' + esc(m.n) + '</b></td>' +
+          '<td><b>' + esc(m.n) + '</b></td>' +
           '<td><span style="font-size:.72rem;padding:2px 8px;border-radius:20px;background:' + (ativa ? '#e8f5e9' : '#fdecea') + ';color:' + (ativa ? '#2e7d32' : '#c0392b') + '">' + (ativa ? '● Ativa' : '● Inativa') + '</span></td>' +
           '<td>' + nColab + ' colaborador(es)</td>' +
           '<td class="doc-size">' + esc(m.rota || 'intra-' + m.key) + '</td>' +
@@ -3502,13 +3557,10 @@ function intraForm(key){
   openModal('<h3>' + (m ? '✏️ Editar intranet — ' + esc(m.n) : '➕ Nova intranet') + '</h3>' +
     '<label>Nome da intranet</label>' +
     '<input id="in-nome" value="' + esc(m ? m.n : '') + '" placeholder="Ex.: Intranet RH">' +
-    '<div class="grid2" style="grid-template-columns:1fr 1fr">' +
-      '<div><label>Status</label><select id="in-ativo">' +
-        '<option value="1"' + (ativa ? ' selected' : '') + '>🟢 Ativa</option>' +
-        '<option value="0"' + (!ativa ? ' selected' : '') + '>🔴 Inativa</option>' +
-      '</select></div>' +
-      '<div><label>Ícone (emoji)</label><input id="in-ic" value="' + esc(m ? m.ic : '🌐') + '"></div>' +
-    '</div>' +
+    '<label>Status</label><select id="in-ativo">' +
+      '<option value="1"' + (ativa ? ' selected' : '') + '>🟢 Ativa</option>' +
+      '<option value="0"' + (!ativa ? ' selected' : '') + '>🔴 Inativa</option>' +
+    '</select>' +
     '<label>Descrição</label>' +
     '<textarea id="in-desc" rows="2" placeholder="O que essa intranet reúne?">' + esc(m ? m.desc : '') + '</textarea>' +
     '<label>👥 Colaboradores com acesso <span class="doc-size">(' + colabs.length + ')</span></label>' +
@@ -3525,16 +3577,15 @@ function saveIntra(key){
   const nome = (v('in-nome') || '').trim();
   if(!nome){ toast('Informe o nome da intranet.', 'err'); return; }
   const desc = (v('in-desc') || '').trim();
-  const ic = (v('in-ic') || '').trim() || '🌐';
   const rota = (v('in-rota') || '').trim().replace(/\s+/g, '-') || ('intra-' + (key || Date.now()));
   const ativo = v('in-ativo') === '1';
   const lista = intraList();
   const alvo = key ? lista.find(function(x){ return x.key === key; }) : null;
   if(alvo){
-    intraCommit(lista.map(function(x){ return x.key === key ? Object.assign({}, x, { n: nome, desc: desc, ic: ic, rota: rota, ativo: ativo }) : x; }));
+    intraCommit(lista.map(function(x){ return x.key === key ? Object.assign({}, x, { n: nome, desc: desc, rota: rota, ativo: ativo }) : x; }));
   } else {
     const novaKey = 'intra' + Date.now();
-    lista.push({ key: novaKey, n: nome, ic: ic, desc: desc, depts: [], rota: rota, ativo: ativo });
+    lista.push({ key: novaKey, n: nome, desc: desc, depts: [], rota: rota, ativo: ativo });
     intraCommit(lista);
   }
   closeModal(); renderPage(); buildNav();
