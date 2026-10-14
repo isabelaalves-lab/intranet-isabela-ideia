@@ -1,0 +1,45 @@
+/* ============================================================
+   INOVACAO.CSS  |  Inovação e Ideias + Sustentabilidade
+   ============================================================ */
+
+/* ---------- Ideias ---------- */
+.idea-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:1px}
+.idea-title{display:flex;align-items:center;gap:12px}
+.idea-title h2{margin:0;color:var(--navy);font-size:1.25rem}
+.idea-accent{width:5px;height:30px;background:#fd5000;border-radius:3px;display:inline-block}
+.idea-count{background:#fff;border:1px solid var(--line);border-radius:99px;padding:6px 14px;font-size:.78rem;font-weight:700;color:var(--navy)}
+.idea-form{padding:18px; margin-top: 5px;}
+.idea-form-head{display:flex;align-items:center;gap:12px}
+.idea-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:1100px){.idea-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:640px){.idea-grid{grid-template-columns:1fr}}
+.idea-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;box-shadow:0 2px 8px rgba(10,42,94,.06);transition:transform .2s ease,box-shadow .2s ease}
+.idea-card:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(10,42,94,.12)}
+.idea-top{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.idea-card h4{color:var(--navy);font-size:.95rem;margin:0 0 6px}
+.idea-card p{color:var(--muted);font-size:.82rem;margin:0 0 12px;flex:1}
+.idea-foot{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:10px}
+.idea-empty{grid-column:1/-1;background:#fff;border:1px dashed var(--line);border-radius:12px;padding:36px;text-align:center;color:var(--muted)}
+.idea-empty span{font-size:2rem;display:block;margin-bottom:8px}
+.idea-empty p{margin:0;font-size:.9rem}
+
+/* ---------- Sustentabilidade ---------- */
+.sust-chip{border:1px solid #d5dde8;background:#fff;color:var(--navy);border-radius:99px;padding:5px 12px;font-size:.75rem;font-weight:600;cursor:pointer;transition:all .2s ease}
+.sust-chip:hover{border-color:var(--sky)}
+.sust-chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.sust-bar{height:12px;border-radius:99px;background:#eef2f8;overflow:hidden}
+.sust-bar > div{height:100%;border-radius:99px;background:#2e9444;width:0}
+.sust-status{display:inline-block;padding:2px 8px;border-radius:99px;font-size:.66rem;font-weight:700}
+.sust-ideia{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.sust-ideia:last-child{margin-bottom:0}
+.sust-dica-card{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fff}
+.sust-dica-card summary{cursor:pointer;font-weight:700;font-size:.85rem;color:var(--navy);list-style:none}
+.sust-dica-card summary::-webkit-details-marker{display:none}
+.sust-dica-card[open] summary{margin-bottom:4px}
+.sust-mural-item{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
+.sust-mural-item img{width:100%;height:150px;object-fit:cover;display:block}
+.sust-mural-item .mbody{padding:10px 12px}
+.sust-like{border:1px solid #d5dde8;background:#fff;border-radius:99px;padding:3px 10px;font-size:.72rem;font-weight:700;cursor:pointer}
+.sust-like.on{background:#1e7a3c;color:#fff;border-color:#1e7a3c}
+
+.card-sust{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);padding:20px;margin-top:0px}

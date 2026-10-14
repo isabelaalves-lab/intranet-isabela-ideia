@@ -1,0 +1,18 @@
+/* ============================================================
+   LOGIN.CSS  |  Tela de acesso da Intranet Italac
+   ============================================================ */
+
+#login-screen{position:fixed;inset:0;z-index:50;overflow:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#081F45,#0A2A5E 55%,#123B7A);padding:24px}
+#login-screen::before{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(circle 90px at 12% 20%,rgba(74,159,216,.16),transparent 70%),radial-gradient(circle 70px at 85% 15%,rgba(242,101,34,.15),transparent 70%),radial-gradient(circle 110px at 80% 85%,rgba(229,35,48,.12),transparent 70%),radial-gradient(circle 60px at 20% 90%,rgba(74,159,216,.12),transparent 70%)}
+.login-box{position:relative;width:420px;max-width:94vw}
+.login-box .card{padding:30px}
+.login-card h3{margin-bottom:4px}
+#login-form .btn{margin-top:16px}
+.pass-wrap{position:relative}
+.pass-wrap .eye{position:absolute;right:10px;top:9px;font-size:1rem}
+.test-accounts{margin-top:14px;border-radius:var(--r);padding:14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);color:#CFE0F5}
+.test-accounts h4{color:#fff;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}
+.test-accounts button{display:flex;justify-content:space-between;gap:8px;width:100%;color:#CFE0F5;padding:6px 8px;border-radius:6px;font-size:.75rem;text-align:left;transition:background .15s}
+.test-accounts button:hover{background:rgba(255,255,255,.08)}
+.test-accounts b{white-space:nowrap}
+@media(max-width:560px){.login-box .card{padding:22px}}

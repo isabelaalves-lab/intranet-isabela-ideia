@@ -1,0 +1,10 @@
+/* ============================================================
+   DOCUMENTOS.CSS  |  Políticas e Normas da Intranet Italac
+   ============================================================ */
+
+.dep{margin-bottom:18px}
+.dep-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between;background:var(--navy);color:#fff;padding:12px 16px;border-radius:var(--r) var(--r) 0 0;font-weight:700;font-size:.9rem}
+.dep-b{background:#fff;border:1px solid var(--line);border-top:0;border-radius:0 0 var(--r) var(--r);overflow:hidden}
+.doc-item{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:11px 16px;border-bottom:1px solid var(--line);font-size:.86rem;transition:background .15s}
+.doc-item:last-child{border:none}
+.doc-item:hover{background:#FAFBFE}

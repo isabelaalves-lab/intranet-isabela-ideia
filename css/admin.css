@@ -1,0 +1,89 @@
+/* ============================================================
+   ADMIN.CSS  |  Intranet Italac
+   Painel do Administrador e permissões.
+   Consolida a seção admin do style.css com as classes
+   utilitárias extraídas dos estilos inline do admin.js.
+   ============================================================ */
+
+/* ---------- Painel ---------- */
+.adm-tabs{display:flex;gap:8px;flex-wrap:wrap;border-bottom:2px solid var(--line);padding-bottom:10px}
+.adm-tab{border:1px solid #d5dde8;background:#fff;color:var(--navy);border-radius:99px;padding:7px 14px;font-size:.8rem;font-weight:600;cursor:pointer;transition:all .2s ease}
+.adm-tab:hover{border-color:var(--sky)}
+.adm-tab.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.adm-tbl{width:100%;border-collapse:collapse;font-size:.82rem}
+.adm-tbl th{text-align:left;padding:8px 10px;color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid var(--line)}
+.adm-tbl td{padding:10px;border-bottom:1px solid #f0f2f5;vertical-align:top}
+.adm-tbl tr:last-child td{border-bottom:none}
+.adm-badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:.66rem;font-weight:700}
+.adm-badge.on{background:#d4edda;color:#1b5e20}
+.adm-badge.off{background:#f8d7da;color:#922b21}
+.adm-badge.warn{background:#fff3cd;color:#7a5900}
+
+/* ---------- Permissões por usuário ---------- */
+.perm-user-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px;margin-bottom:12px}
+.perm-user-grid label{display:flex;align-items:center;gap:8px;font-size:.8rem;font-weight:600;color:#0f2a5e;background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px;cursor:pointer}
+.perm-user-grid input[type=checkbox]{width:15px;height:15px;flex:0 0 auto;margin:0;accent-color:#0f2a5e;cursor:pointer}
+
+/* ---------- Cabeçalho padrão dos cards ---------- */
+.adm-card-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.adm-card-title{font-size:1rem;margin:0}
+
+/* ---------- Espaçamento ---------- */
+.m0{margin:0 !important}
+.mt4{margin-top:4px !important}
+.mt8{margin-top:8px !important}
+.mt10{margin-top:10px !important}
+.mt12{margin-top:12px !important}
+.mt14{margin-top:14px !important}
+.mt16{margin-top:16px !important}
+.mb8{margin-bottom:8px !important}
+.mb10{margin-bottom:10px !important}
+.mb12{margin-bottom:12px !important}
+.mb14{margin-bottom:14px !important}
+.m4-8{margin:4px 0 8px !important}
+
+/* ---------- Layout ---------- */
+.flex-row{display:flex;gap:8px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.nowrap{white-space:nowrap}
+
+/* ---------- Cores ---------- */
+.c-danger{color:#c0392b !important}
+.c-ok{color:#1b5e20 !important}
+.c-sky{color:var(--sky)}
+.fw600{font-weight:600}
+.star{font-size:1.05rem;background:none;border:none;cursor:pointer}
+.star.on{color:#e67e22}
+.star.off{color:#cbd5e1}
+.star-amber{color:#f5a623}
+
+/* ---------- Largura de colunas ---------- */
+.w150{width:150px !important}
+.w170{width:170px !important}
+.w180{width:180px !important}
+.w200{width:200px !important}
+.w220{width:220px !important}
+
+/* ---------- Formulário de usuário ---------- */
+.caixa-permissoes{margin-top:10px;padding:12px;background:#EEF2F8;border-radius:10px}
+.perm-titulo{font-size:.8rem;color:var(--navy)}
+.perm-intra-titulo{margin:14px 0 4px;font-size:.9rem;color:var(--navy)}
+
+/* ---------- Programa: anexo do manual ---------- */
+.anexo-atual{margin:6px 0 10px;padding:8px 10px;background:#f1f5f9;border-radius:8px;font-size:.8rem;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.anexo-remover{background:none;border:none;color:#c0392b;cursor:pointer;font-size:.75rem;font-weight:700}
+.divider{border:none;border-top:1px solid var(--line);margin:14px 0}
+.form-sec-titulo{margin:0 0 4px;font-size:.9rem;color:var(--navy)}
+.prog-check-row{display:flex;align-items:center;gap:8px;margin-top:12px;white-space:nowrap}
+.prog-check-row input{width:16px;height:16px;flex:0 0 auto;margin:0;accent-color:#f5a623;cursor:pointer}
+.prog-check-row span{font-size:.85rem;font-weight:600;color:var(--navy);cursor:pointer}
+
+/* ---------- Intranets ---------- */
+.status-chip{display:inline-block;font-size:.72rem;padding:2px 8px;border-radius:20px}
+.status-chip.on{background:#e8f5e9;color:#2e7d32}
+.status-chip.off{background:#fdecea;color:#c0392b}
+.row-off{opacity:.55}
+.colab-list{padding:10px;max-height:170px;overflow-y:auto;background:#fff;border:1px solid var(--line);border-radius:12px}
+.intra-item-nome{font-size:.84rem}
+.intra-item-sub{font-size:.72rem;color:var(--muted)}
+.modal-btn-row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}

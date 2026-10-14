@@ -1,0 +1,25 @@
+/* ============================================================
+   VAGAS.CSS  |  Vagas Internas da Intranet Italac
+   ============================================================ */
+
+.vagas-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+.vagas-title{display:flex;align-items:center;gap:12px}
+.vagas-title h2{margin:0;color:var(--navy);font-size:1.25rem}
+.vagas-accent{width:5px;height:30px;background:#fd5000;border-radius:3px;display:inline-block}
+.vagas-count{background:#fff;border:1px solid var(--line);border-radius:99px;padding:6px 14px;font-size:.78rem;font-weight:700;color:var(--navy)}
+.vagas-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:1100px){.vagas-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:640px){.vagas-grid{grid-template-columns:1fr}}
+.vaga-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;height:100%;box-shadow:0 2px 8px rgba(10,42,94,.06);transition:transform .2s ease,box-shadow .2s ease}
+.vaga-card:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(10,42,94,.12)}
+.vaga-top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.vaga-badge{background:var(--sky);color:#fff;font-size:.68rem;font-weight:700;padding:4px 10px;border-radius:99px;letter-spacing:.3px}
+.vaga-deadline{font-size:.7rem;color:var(--muted);font-weight:600}
+.vaga-card h4{color:var(--navy);font-size:.95rem;margin:0 0 4px}
+.vaga-loc{color:#fd5000;font-size:.78rem;font-weight:700;margin-bottom:8px}
+.vaga-desc{color:var(--muted);font-size:.82rem;margin:0 0 10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.vaga-req{font-size:.8rem;color:#444;background:#F7F9FC;border-radius:8px;padding:10px 12px;margin-bottom:14px;flex:1;line-height:1.5}
+.vaga-btn{margin-top:auto;border-radius:8px}
+.vaga-empty{grid-column:1/-1;background:#fff;border:1px dashed var(--line);border-radius:12px;padding:36px;text-align:center;color:var(--muted)}
+.vaga-empty span{font-size:2rem;display:block;margin-bottom:8px}
+.vaga-empty p{margin:0;font-size:.9rem}
