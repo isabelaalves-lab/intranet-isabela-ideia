@@ -23,7 +23,7 @@ document.addEventListener('click', e => {
 
 /* ================= 6. LOGO E REDES SOCIAIS ================= */
 function logoHTML(light, src){
-  return '<img src="' + (src || 'logo.png') + '?v=' + Date.now() + '" alt="Italac" class="logo-img">';
+  return '<img src="' + (src || 'assets/logo.png') + '?v=' + Date.now() + '" alt="Italac" class="logo-img">';
 }
   const SOCIAL = [
   { n:'Instagram', u:'https://www.instagram.com/italac_oficial/',

@@ -81,14 +81,14 @@ function startApp(){
 
   /* Logos e redes */
   document.getElementById('logo-login').innerHTML = logoHTML(true);
-document.getElementById('logo-side').innerHTML  = logoHTML(true, 'logo2.png');
+document.getElementById('logo-side').innerHTML  = logoHTML(true, 'assets/logo2.png');
   document.getElementById('logo-top').innerHTML   =logoHTML(true);
     '<div style="transform:scale(.62);transform-origin:left center">' + logoHTML(true) + '</div>';
   document.getElementById('social-side').innerHTML = socHTML;
 
   /* Rodapé com logo + redes */
   document.getElementById('site-footer').innerHTML =
-    logoHTML(true, 'logo2.png') +
+    logoHTML(true, 'assets/logo2.png') +
     '<div>© 2026 Goiasminas Indústria de Laticínios — Intranet Corporativa</div>' +
     '<div class="social-row" style="margin-left:auto">' + socHTML + '</div>';
 

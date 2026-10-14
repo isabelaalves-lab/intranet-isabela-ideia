@@ -37,13 +37,15 @@ function pPerfil(){
     '</div>' +
     '</div>' +
     '<div class="card-perfil"><h3 class="navy-text" style="font-size:1rem;margin-bottom:10px">✍️ Gerador de Assinatura de E-mail</h3>' +
-    '<div id="sig-preview" style="border:1px dashed var(--line);border-radius:10px;padding:14px;font-size:.85rem">' +
-    '<b>' + esc(u.nomeCompleto) + '</b><br>' + esc(u.cargo) + '<br>' +
-    'Italac — Goiasminas Indústria de Laticínios<br>' +
-    esc(u.email) + ' • Ramal ' + esc(u.ramal || '—') + '</div>' +
-    '<button class="btn btn-navy btn-sm" style="margin-top:12px" onclick="copySig()">Copiar assinatura</button>' +
-    '</div></div>';
+    '<div id="sig-preview" style="border:1px dashed var(--line);border-radius:10px;padding:14px;overflow-x:auto">' +
+      assinaturaHtml(u) +
+    '</div>' +
+    '<button class="btn btn-navy btn-sm" style="margin-top:12px" onclick="copySig()">📋 Copiar assinatura</button>' +
+    '<p class="doc-size" style="margin-top:8px">A assinatura usa seus dados do cadastro. Se o admin alterar nome, cargo ou setor, ela acompanha automaticamente.</p>' +
+    '</div>' +
+    '</div>';
 }
+
 function savePrefName(){
   const u = me();
   u.nomePreferido = v('pref-name').trim() || u.nomeCompleto.split(' ')[0];
@@ -55,11 +57,29 @@ function savePrefName(){
 
 function copySig(){
   const u = me();
-    const sig = u.nomeCompleto + '\n' + u.cargo + '\nItalac — Goiasminas Indústria de Laticínios\n' +
-    u.email + ' • Ramal ' + (u.ramal || '—') +
-    (u.seloVerde ? '\n🏅 Selo Verde — Sustentabilidade Italac' : '');
-  navigator.clipboard.writeText(sig)
-    .then(() => toast('Assinatura copiada!', 'ok'))
+  const html = assinaturaHtml(u);
+  if(!html){ toast('Nenhum usuário logado.', 'err'); return; }
+  const aux = document.createElement('div');
+  aux.setAttribute('contenteditable', 'true');
+  aux.style.position = 'fixed';
+  aux.style.left = '-9999px';
+  aux.innerHTML = html;
+  document.body.appendChild(aux);
+  const sel = window.getSelection();
+  const range = document.createRange();
+  range.selectNodeContents(aux);
+  sel.removeAllRanges();
+  sel.addRange(range);
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch(e){ ok = false; }
+  sel.removeAllRanges();
+  document.body.removeChild(aux);
+  if(ok){ toast('Assinatura copiada! Cole no editor do e-mail.', 'ok'); return; }
+  const texto = u.nomeCompleto + '\n' +
+    ((u.cargo && u.setor) ? (u.cargo + ' | ' + u.setor) : (u.cargo || u.setor || '')) +
+    '\nTel. (11) 3014-4492';
+  navigator.clipboard.writeText(texto)
+    .then(() => toast('Assinatura copiada em texto simples.', 'ok'))
     .catch(() => toast('Não foi possível copiar.', 'err'));
 }
 function salvarFoto(input){
