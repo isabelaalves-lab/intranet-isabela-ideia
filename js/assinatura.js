@@ -15,22 +15,21 @@ function assinaturaHtml(u) {
         '<div style="font-size:18px;font-weight:700;color:#1A237E">' + nome + '</div>' +
       '</td>' +
       '<td style="vertical-align:top;padding:0 0 0 14px;border-left:2px solid #5C96C2;font-size:14px">' +
-        '<div style="color:#5C96C2;font-size:12px;font-weight:700;letter-spacing:.02em">Setor</div>' +
-        '<div style="color:#5C96C2;font-weight:700;font-size:14px">' + setorValor + '</div>' +
+        '<div style="color:#5C96C2;font-weight:700;font-size:16px">' + setorValor + '</div>' +
         '<div style="color:#1A237E;font-size:13px">Tel. (11) 3014-4492</div>' +
       '</td>' +
     '</tr>' +
     '<tr>' +
-      '<td colspan="2" style="padding:14px 0 6px;text-align:center">' +
+      '<td colspan="2" style="padding:14px 0 6px; margin-left:100px">' +
         '<img src="' + esc(ASSINATURA_LOGOS_SRC) + '" ' +
           'alt="Italac | Italakinho | Italac PROPLAY | Chocky | Nilza" ' +
-          'style="max-height:42px;display:inline-block">' +
+          'style="width:480px;max-width:100%;height:auto;display:block;margin:0 auto">' +
       '</td>' +
     '</tr>' +
     '<tr>' +
       '<td colspan="2" style="padding:6px 0 0;text-align:center">' +
-        '<div style="font-weight:700;color:#1A237E;font-size:13px">Política de Privacidade</div>' +
-        '<div style="font-size:10px;color:#1A237E;text-align:justify;line-height:1.4;margin-top:4px">' +
+        '<div style="color:#1A237E;font-size:11px">Política de Privacidade</div>' +
+        '<div style="font-size:11px;color:#1A237E;text-align:justify;line-height:1.4;margin-top:4px">' +
           esc(ASSINATURA_POLITICA) + '</div>' +
       '</td>' +
     '</tr>' +
